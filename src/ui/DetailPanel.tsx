@@ -2,6 +2,7 @@ import React from 'react';
 import { GameState } from '../sim/types';
 import { INCIDENTS } from '../data/incidents';
 import { ACTIONS } from '../data/actions';
+import TaskModal from './TaskModal';
 
 interface DetailPanelProps {
   state: GameState;
@@ -21,6 +22,16 @@ export default function DetailPanel({
   onExecuteAIAction,
 }: DetailPanelProps) {
   const [activeTab, setActiveTab] = React.useState<'node' | 'incident' | 'strategy'>('node');
+  const [taskModalOpen, setTaskModalOpen] = React.useState(false);
+  const [taskModalData, setTaskModalData] = React.useState<{
+    incidentName: string;
+    incidentDescription: string;
+    actionName: string;
+    actionDescription: string;
+    targetNode: string;
+    actionId: string;
+    incidentId?: string;
+  } | null>(null);
 
   // Auto-switch to incident tab when an incident is selected
   React.useEffect(() => {
@@ -339,12 +350,19 @@ export default function DetailPanel({
                           <button
                             key={idx}
                             className={`action-button resolution ai-action ${isInProgress ? 'in-progress' : ''}`}
-                            onClick={() => onExecuteAIAction(
-                              aiAction.actionName,
-                              aiAction.cost,
-                              aiAction.durationSeconds,
-                              selectedIncident.id
-                            )}
+                            onClick={() => {
+                              // Open task modal instead of executing directly
+                              setTaskModalData({
+                                incidentName: selectedIncident.aiIncidentName || 'AI Incident',
+                                incidentDescription: selectedIncident.aiDescription || '',
+                                actionName: aiAction.actionName,
+                                actionDescription: aiAction.description,
+                                targetNode: selectedIncident.targetNodeId,
+                                actionId: `ai_${aiAction.actionName.replace(/\s+/g, '_').toLowerCase()}`,
+                                incidentId: selectedIncident.id,
+                              });
+                              setTaskModalOpen(true);
+                            }}
                             disabled={!canExecute || isInProgress}
                           >
                             <div className="action-name">
@@ -474,6 +492,35 @@ export default function DetailPanel({
           </div>
         )}
       </div>
+
+      {/* Task Modal */}
+      {taskModalOpen && taskModalData && (
+        <TaskModal
+          incidentName={taskModalData.incidentName}
+          incidentDescription={taskModalData.incidentDescription}
+          actionName={taskModalData.actionName}
+          actionDescription={taskModalData.actionDescription}
+          targetNode={taskModalData.targetNode}
+          onComplete={() => {
+            setTaskModalOpen(false);
+            // Execute the actual action after task completion
+            if (taskModalData.incidentId) {
+              // Find the AI action details to get cost and duration
+              const incident = state.activeIncidents.find(i => i.id === taskModalData.incidentId);
+              const aiAction = incident?.aiSuggestedActions?.find(a => a.actionName === taskModalData.actionName);
+              if (aiAction) {
+                onExecuteAIAction(
+                  taskModalData.actionName,
+                  aiAction.cost,
+                  aiAction.durationSeconds,
+                  taskModalData.incidentId
+                );
+              }
+            }
+          }}
+          onClose={() => setTaskModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

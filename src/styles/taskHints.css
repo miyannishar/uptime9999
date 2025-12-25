@@ -1,0 +1,104 @@
+/* Task Hints and Context */
+.task-hints {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hint-box {
+  background: rgba(0, 150, 255, 0.1);
+  border-left: 3px solid var(--accent-blue);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.hint-box strong {
+  color: var(--accent-cyan);
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.hint-box code {
+  background: var(--bg-tertiary);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  color: var(--accent-yellow);
+}
+
+.hint-box.expected-fix {
+  background: rgba(16, 185, 129, 0.1);
+  border-left-color: var(--good);
+}
+
+.hint-box.expected-fix pre {
+  background: var(--bg-tertiary);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  color: var(--good);
+}
+
+.hint-reveal-btn {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.hint-reveal-btn:hover {
+  background: rgba(0, 150, 255, 0.2);
+  transform: translateX(5px);
+}
+
+/* Task Actions (multiple buttons) */
+.task-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.task-skip-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.task-skip-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+
+.task-skip-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.task-submit-btn {
+  flex: 2;
+}
+
+.task-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+

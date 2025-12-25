@@ -17,6 +17,8 @@ import GameOverModal from './ui/GameOverModal';
 import { useResizable } from './hooks/useResizable';
 import { GAME_CONFIG } from './config/gameConfig';
 import './styles/theme.css';
+import './styles/tasks.css';
+import './styles/taskHints.css';
 
 function App() {
   const [seed, setSeed] = useState(generateSeed());
