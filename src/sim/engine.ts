@@ -12,8 +12,6 @@ import {
   computeChurnRate,
   computeReputationDelta,
   computeAlertFatigueGrowth,
-  computeHazardMultiplier,
-  computeDifficultyMultiplier,
 } from './formulas';
 import { INCIDENTS } from '../data/incidents';
 import { createInitialArchitecture } from '../data/architecture';
@@ -31,6 +29,9 @@ export function createInitialState(seed: string): GameState {
     hourOfDay: 9,
     paused: false,
     speed: 1,
+
+    aiSessionActive: false, // Will be set to true when AI initializes
+    recentIncidentTargets: [], // Track recently targeted nodes for diversity
 
     architecture,
 
@@ -74,7 +75,7 @@ export function createInitialState(seed: string): GameState {
   };
 }
 
-export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1): GameState {
+export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1): GameState {
   if (state.paused || state.gameOver) return state;
 
   const newState = { ...state };
@@ -105,10 +106,17 @@ export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1)
   // === 6. BUSINESS LOGIC ===
   updateBusiness(newState, dt);
 
-  // === 7. SPAWN INCIDENTS ===
-  spawnIncidents(newState, rng, dt);
+  // === 7. INCIDENTS ===
+  // All incidents are now AI-generated based on system metrics
+  
+  // === 8. CLEANUP OLD INCIDENT TARGETS ===
+  // Remove targets older than 60 seconds to allow re-targeting
+  const now = Date.now();
+  newState.recentIncidentTargets = newState.recentIncidentTargets.filter(
+    t => now - t.timestamp < 60000
+  );
 
-  // === 8. RESOLVE INCIDENTS ===
+  // === 9. RESOLVE INCIDENTS ===
   updateIncidents(newState, dt);
 
   // === 9. UPDATE ACTIONS ===
@@ -188,30 +196,138 @@ function propagateLoad(state: GameState, ingressRPS: number) {
 function applyIncidentEffects(state: GameState, dt: number) {
   const { nodes } = state.architecture;
 
+  // Track cumulative effects per node to prevent stacking
+  const nodeHealthDecay = new Map<string, number>();
+  const nodeErrorMult = new Map<string, number>();
+  const nodeLatencyMult = new Map<string, number>();
+  const nodeUtilMult = new Map<string, number>();
+
+  // First pass: collect all effects
   for (const incident of state.activeIncidents) {
+    // Handle AI-generated incidents
+    if (incident.aiGenerated) {
+      const targetNode = nodes.get(incident.targetNodeId);
+      if (!targetNode) continue;
+
+      // OPTIMIZATION incidents have no negative effects - skip applying effects
+      const aiCategory = (incident as any).aiCategory;
+      if (aiCategory === 'OPTIMIZATION') {
+        continue; // Skip applying effects for optimization opportunities
+      }
+
+      // Check if there's an action in progress mitigating this incident
+      const hasMitigatingAction = state.actionsInProgress.some(
+        action => action.mitigatingIncidentId === incident.id
+      );
+      
+      // Apply immediate mitigation if action is in progress
+      const immediateMitigation = hasMitigatingAction 
+        ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
+        : 0;
+      const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
+
+      // Get AI-specified effects from the original incident data
+      const aiEffects = (incident as any).aiEffects;
+      
+      // Apply AI-specified effects if available
+      if (aiEffects) {
+        if (aiEffects.errorMultiplier) {
+          const effectiveMultiplier = 1 + (aiEffects.errorMultiplier - 1) * mitigationFactor;
+          const current = nodeErrorMult.get(incident.targetNodeId) || 1;
+          nodeErrorMult.set(incident.targetNodeId, current * effectiveMultiplier);
+        }
+        if (aiEffects.latencyMultiplier) {
+          const effectiveMultiplier = 1 + (aiEffects.latencyMultiplier - 1) * mitigationFactor;
+          const current = nodeLatencyMult.get(incident.targetNodeId) || 1;
+          nodeLatencyMult.set(incident.targetNodeId, current * effectiveMultiplier);
+        }
+        if (aiEffects.utilizationMultiplier) {
+          const effectiveMultiplier = 1 + (aiEffects.utilizationMultiplier - 1) * mitigationFactor;
+          const current = nodeUtilMult.get(incident.targetNodeId) || 1;
+          nodeUtilMult.set(incident.targetNodeId, current * effectiveMultiplier);
+        }
+        if (aiEffects.healthDecayPerSec) {
+          const decay = aiEffects.healthDecayPerSec * mitigationFactor;
+          const current = nodeHealthDecay.get(incident.targetNodeId) || 0;
+          nodeHealthDecay.set(incident.targetNodeId, current + decay);
+        }
+        
+        // Apply component-specific metric effects
+        if (aiEffects.metricEffects && targetNode.specificMetrics) {
+          for (const [metricKey, effectValue] of Object.entries(aiEffects.metricEffects)) {
+            if (metricKey in targetNode.specificMetrics) {
+              const currentValue = targetNode.specificMetrics[metricKey];
+              if (typeof currentValue === 'number' && typeof effectValue === 'number') {
+                // Apply effect with mitigation factor
+                const effectiveChange = effectValue * mitigationFactor;
+                targetNode.specificMetrics[metricKey] = Math.max(0, currentValue + effectiveChange);
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback: Apply effects based on severity
+        if (incident.severity === 'CRIT') {
+          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
+          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 3.0 * mitigationFactor));
+          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
+          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 2.5 * mitigationFactor));
+          const currentDecay = nodeHealthDecay.get(incident.targetNodeId) || 0;
+          nodeHealthDecay.set(incident.targetNodeId, currentDecay + 0.02 * mitigationFactor);
+        } else if (incident.severity === 'WARN') {
+          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
+          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 1.5 * mitigationFactor));
+          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
+          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.3 * mitigationFactor));
+        } else if (incident.severity === 'INFO') {
+          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
+          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.1 * mitigationFactor));
+        }
+      }
+      
+      continue;
+    }
+
     const incidentDef = INCIDENTS.find(i => i.id === incident.definitionId);
     if (!incidentDef) continue;
 
-    const targetNode = nodes.get(incident.targetNodeId);
+    const targetNodeId = incident.targetNodeId;
+    const targetNode = nodes.get(targetNodeId);
     if (!targetNode) continue;
 
-    const effects = incidentDef.effects;
-    const mitigationFactor = 1 - incident.mitigationLevel * 0.7; // Max 70% reduction
+    // Check if there's an action in progress mitigating this incident
+    const hasMitigatingAction = state.actionsInProgress.some(
+      action => action.mitigatingIncidentId === incident.id
+    );
+    
+    // Apply immediate mitigation if action is in progress
+    const immediateMitigation = hasMitigatingAction 
+      ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
+      : 0;
+    const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
 
-    // Apply effects
+    const effects = incidentDef.effects;
+
+    // Collect effects (to be applied in second pass with caps)
     if (effects.utilizationMultiplier) {
-      targetNode.utilization *= effects.utilizationMultiplier * mitigationFactor;
+      const current = nodeUtilMult.get(targetNodeId) || 1;
+      nodeUtilMult.set(targetNodeId, current * (effects.utilizationMultiplier * mitigationFactor));
     }
     if (effects.latencyMultiplier) {
-      targetNode.latency *= effects.latencyMultiplier * mitigationFactor;
+      const current = nodeLatencyMult.get(targetNodeId) || 1;
+      nodeLatencyMult.set(targetNodeId, current * (effects.latencyMultiplier * mitigationFactor));
     }
     if (effects.errorMultiplier) {
-      targetNode.errorRate *= effects.errorMultiplier * mitigationFactor;
+      const current = nodeErrorMult.get(targetNodeId) || 1;
+      nodeErrorMult.set(targetNodeId, current * (effects.errorMultiplier * mitigationFactor));
     }
     if (effects.healthDecayPerSec) {
-      targetNode.health = Math.max(0, targetNode.health - effects.healthDecayPerSec * dt * mitigationFactor);
+      const decay = effects.healthDecayPerSec * mitigationFactor;
+      const current = nodeHealthDecay.get(targetNodeId) || 0;
+      nodeHealthDecay.set(targetNodeId, current + decay);
     }
     if (effects.capacityMultiplier) {
+      // Capacity changes are applied immediately (not multiplicative)
       targetNode.capacity *= effects.capacityMultiplier;
     }
 
@@ -246,6 +362,39 @@ function applyIncidentEffects(state: GameState, dt: number) {
       }
     }
   }
+
+  // Second pass: Apply collected effects with caps to prevent death spiral
+  const caps = GAME_CONFIG.incidents.aiEffectCaps;
+  
+  nodes.forEach((node, nodeId) => {
+    // Apply error multiplier (capped)
+    const errorMult = nodeErrorMult.get(nodeId);
+    if (errorMult) {
+      const cappedMult = Math.min(errorMult, caps.maxErrorMultiplier);
+      node.errorRate *= cappedMult;
+    }
+
+    // Apply latency multiplier (capped)
+    const latencyMult = nodeLatencyMult.get(nodeId);
+    if (latencyMult) {
+      const cappedMult = Math.min(latencyMult, caps.maxLatencyMultiplier);
+      node.latency *= cappedMult;
+    }
+
+    // Apply utilization multiplier (capped)
+    const utilMult = nodeUtilMult.get(nodeId);
+    if (utilMult) {
+      const cappedMult = Math.min(utilMult, caps.maxUtilizationMultiplier);
+      node.utilization *= cappedMult;
+    }
+
+    // Apply health decay (capped per second, not per incident)
+    const healthDecay = nodeHealthDecay.get(nodeId);
+    if (healthDecay) {
+      const cappedDecay = Math.min(healthDecay, caps.maxHealthDecayPerSec);
+      node.health = Math.max(0, node.health - cappedDecay * dt);
+    }
+  });
 }
 
 function computeGlobalMetrics(state: GameState) {
@@ -271,19 +420,26 @@ function updateUptime(state: GameState, dt: number) {
   // Check if system is up - check critical nodes too
   const { nodes } = state.architecture;
   
-  // Critical nodes that must be up
+  // Critical nodes that must be up - use gradual health thresholds
   const criticalNodes = ['dns', 'app', 'db_primary'];
-  const criticalNodesUp = criticalNodes.every(id => {
+  let criticalNodesHealth = 1.0;
+  criticalNodes.forEach(id => {
     const node = nodes.get(id);
-    return node && node.enabled && node.operationalMode !== 'down' && node.health > 0.1;
+    if (!node || !node.enabled || node.operationalMode === 'down') {
+      criticalNodesHealth = 0;
+    } else if (node.health < 0.3) {
+      // Start degrading uptime gradually when health < 30%
+      criticalNodesHealth = Math.min(criticalNodesHealth, node.health / 0.3);
+    }
   });
   
   // System is up if error rate is reasonable, latency is acceptable, and critical nodes are healthy
-  const isUp = criticalNodesUp && 
-               state.globalErrorRate < 0.5 && 
-               state.globalLatencyP95 < 5000;
+  // Use gradual degradation instead of binary
+  const errorFactor = state.globalErrorRate < 0.5 ? 1.0 : Math.max(0, 1 - (state.globalErrorRate - 0.5) * 2);
+  const latencyFactor = state.globalLatencyP95 < 5000 ? 1.0 : Math.max(0, 1 - (state.globalLatencyP95 - 5000) / 10000);
   
-  const uptimeValue = isUp ? 1 : 0;
+  // Uptime value is a combination of factors (gradual degradation)
+  const uptimeValue = criticalNodesHealth * errorFactor * latencyFactor;
 
   // Update window
   state.uptimeWindow.shift();
@@ -293,7 +449,8 @@ function updateUptime(state: GameState, dt: number) {
   const sum = state.uptimeWindow.reduce((a, b) => a + b, 0);
   state.uptime = sum / state.uptimeWindow.length;
 
-  // Update streak
+  // Update streak - use threshold for "up"
+  const isUp = uptimeValue > 0.7; // Consider "up" if above 70%
   if (isUp) {
     state.uptimeStreak += dt;
     state.longestStreak = Math.max(state.longestStreak, state.uptimeStreak);
@@ -346,65 +503,34 @@ function updateBusiness(state: GameState, dt: number) {
   state.reputation = Math.max(0, Math.min(100, state.reputation + reputationDelta * dt));
 }
 
-function spawnIncidents(state: GameState, rng: SeededRNG, dt: number) {
-  const elapsed = (Date.now() - state.startTime) / 1000;
-  const difficultyMultiplier = computeDifficultyMultiplier(
-    elapsed,
-    state.peakUsers,
-    state.uptimeStreak,
-    state.cash
-  );
-
-  for (const incidentDef of INCIDENTS) {
-    // Check preconditions
-    const targets = Array.from(state.architecture.nodes.values()).filter(node => {
-      if (!node.enabled) return false;
-      if (!incidentDef.targetTypes.includes(node.type)) return false;
-
-      const pre = incidentDef.preconditions;
-      if (pre.minUtilization && node.utilization < pre.minUtilization) return false;
-      if (pre.maxUtilization && node.utilization > pre.maxUtilization) return false;
-      if (pre.featureDisabled && node.features[pre.featureDisabled as keyof typeof node.features]) return false;
-      if (pre.minTechDebt && state.techDebt < pre.minTechDebt) return false;
-      if (pre.minErrorRate && node.errorRate < pre.minErrorRate) return false;
-
-      return true;
-    });
-
-    if (targets.length === 0) continue;
-
-    // Compute spawn chance
-    const target = rng.pick(targets);
-    const hazardMult = computeHazardMultiplier(
-      target.utilization,
-      target.errorRate,
-      state.techDebt,
-      target.securityScore,
-      difficultyMultiplier
-    );
-
-    const spawnChance = incidentDef.baseRatePerMinute * hazardMult * (dt / 60);
-
-    if (rng.chance(spawnChance)) {
-      // Spawn incident
-      state.activeIncidents.push({
-        id: `incident_${Date.now()}_${Math.random()}`,
-        definitionId: incidentDef.id,
-        targetNodeId: target.id,
-        severity: incidentDef.severity,
-        startTime: Date.now(),
-        escalationTimer: incidentDef.escalationTimeSeconds || 0,
-        outagetimer: incidentDef.timeToOutageSeconds || 0,
-        mitigationLevel: 0,
-        mitigationProgress: 0,
-      });
-      state.totalIncidents++;
-    }
-  }
-}
+// DEPRECATED: Old hardcoded incident spawning removed
+// All incidents are now AI-generated based on real system metrics
 
 function updateIncidents(state: GameState, _dt: number) {
   state.activeIncidents = state.activeIncidents.filter(incident => {
+    // AI-generated incidents
+    if (incident.aiGenerated) {
+      const elapsed = (Date.now() - incident.startTime) / 1000;
+      
+      // Auto-resolve after 300s if not specified
+      const autoResolveTime = incident.outagetimer || 300;
+      if (elapsed > autoResolveTime) {
+        state.resolvedIncidents++;
+        console.log('🔄 AI incident auto-resolved:', (incident as any).aiIncidentName);
+        return false;
+      }
+
+      // Fully mitigated
+      if (incident.mitigationLevel >= 1.0) {
+        state.resolvedIncidents++;
+        console.log('✅ AI incident mitigated:', (incident as any).aiIncidentName);
+        return false;
+      }
+
+      return true;
+    }
+    
+    // Regular incidents
     const incidentDef = INCIDENTS.find(i => i.id === incident.definitionId);
     if (!incidentDef) return false;
 
@@ -454,6 +580,13 @@ function updateActions(state: GameState, _dt: number) {
   // Remove completed actions and finalize their mitigation
   state.actionsInProgress = state.actionsInProgress.filter(action => {
     if (now >= action.endTime) {
+      // Use dynamic import for terminal logger
+      import('../utils/terminalLog').then(({ tlog }) => {
+        tlog.success('═══════════════════════════════════════════════');
+        tlog.success(`✅ ACTION COMPLETED: ${action.actionId}`);
+        tlog.success('═══════════════════════════════════════════════');
+      });
+      
       // Action complete - finalize mitigation if it was mitigating an incident
       if (action.mitigatingIncidentId) {
         const incident = state.activeIncidents.find(i => i.id === action.mitigatingIncidentId);
@@ -461,6 +594,72 @@ function updateActions(state: GameState, _dt: number) {
           // Permanently add to base mitigation level using config
           incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + mitigationPerAction);
           incident.mitigationProgress = incident.mitigationLevel;
+          
+          // Apply remaining metric improvements from AI actions (70% on completion)
+          if (action.actionId.startsWith('ai_') && incident.aiSuggestedActions) {
+            const actionName = action.actionId.replace(/^ai_/, '').replace(/_/g, ' ');
+            const aiAction = incident.aiSuggestedActions.find(a => 
+              a.actionName.toLowerCase().includes(actionName.toLowerCase().substring(0, 15))
+            );
+            
+            if (aiAction && (aiAction as any).metricImprovements) {
+              const targetNode = state.architecture.nodes.get(incident.targetNodeId);
+              if (targetNode && targetNode.specificMetrics) {
+                const improvements = (aiAction as any).metricImprovements;
+                
+                // Import terminal logger dynamically
+                import('../utils/terminalLog').then(({ tlog }) => {
+                  tlog.info(`📈 Applying metric improvements for ${targetNode.name}:`);
+                });
+                
+                for (const [metricKey, improvement] of Object.entries(improvements)) {
+                  if (metricKey in targetNode.specificMetrics) {
+                    if (typeof improvement === 'number') {
+                      const currentValue = targetNode.specificMetrics[metricKey];
+                      if (typeof currentValue === 'number') {
+                        // Apply remaining 70% improvement on completion (30% was applied on start)
+                        const finalImprovement = improvement * 0.7;
+                        let newValue = currentValue + finalImprovement;
+                        
+                        // Clamp values appropriately
+                        if (metricKey.includes('Percent') || metricKey.includes('Rate') || metricKey === 'hitRate') {
+                          newValue = Math.max(0, Math.min(1, newValue)); // Rates: 0-1
+                        } else if (metricKey.includes('GB') || metricKey.includes('connections') || metricKey.includes('instances')) {
+                          newValue = Math.max(0, Math.round(newValue)); // Whole numbers
+                        } else {
+                          newValue = Math.max(0, newValue); // Just positive
+                        }
+                        
+                        targetNode.specificMetrics[metricKey] = newValue;
+                        
+                        // Log to terminal
+                        const change = newValue - currentValue;
+                        const sign = change > 0 ? '+' : '';
+                        import('../utils/terminalLog').then(({ tlog }) => {
+                          tlog.info(`   ${metricKey}: ${currentValue.toFixed(2)} → ${newValue.toFixed(2)} (${sign}${change.toFixed(2)})`);
+                        });
+                      }
+                    } else if (typeof improvement === 'boolean') {
+                      // Boolean toggles
+                      const oldValue = targetNode.specificMetrics[metricKey];
+                      targetNode.specificMetrics[metricKey] = improvement;
+                      import('../utils/terminalLog').then(({ tlog }) => {
+                        tlog.info(`   ${metricKey}: ${oldValue} → ${improvement}`);
+                      });
+                    } else if (typeof improvement === 'number') {
+                      // Direct value set
+                      const oldValue = targetNode.specificMetrics[metricKey];
+                      targetNode.specificMetrics[metricKey] = improvement;
+                      import('../utils/terminalLog').then(({ tlog }) => {
+                        tlog.info(`   ${metricKey}: ${oldValue} → ${improvement}`);
+                      });
+
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
       return false; // Remove completed action

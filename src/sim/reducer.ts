@@ -11,13 +11,20 @@ export type GameAction =
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'SET_SPEED'; speed: number }
   | { type: 'EXECUTE_ACTION'; actionId: string; rng: SeededRNG; mitigatingIncidentId?: string }
+  | { type: 'EXECUTE_AI_ACTION'; actionName: string; cost: number; duration: number; mitigatingIncidentId: string }
   | { type: 'MITIGATE_INCIDENT'; incidentId: string; actionId: string }
+  | { type: 'SET_AI_SESSION_ACTIVE'; active: boolean }
+  | { type: 'TRACK_INCIDENT_TARGET'; nodeId: string }
+  | { type: 'SPAWN_AI_INCIDENT'; incident: any }
   | { type: 'NEW_GAME'; seed: string }
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'DEBUG_SPAWN_INCIDENT'; incidentId: string; targetNodeId: string };
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'TICK':
+      return state; // Handled in App component via tickSimulation
+
     case 'TOGGLE_PAUSE':
       return { ...state, paused: !state.paused };
 
@@ -27,8 +34,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'EXECUTE_ACTION':
       return executeAction(state, action.actionId, action.rng, action.mitigatingIncidentId);
 
-    case 'MITIGATE_INCIDENT':
-      return mitigateIncident(state, action.incidentId, action.actionId);
+    case 'SET_AI_SESSION_ACTIVE':
+      return { ...state, aiSessionActive: action.active };
+
+    case 'TRACK_INCIDENT_TARGET':
+      // Track this node as recently targeted (for AI diversity)
+      return {
+        ...state,
+        recentIncidentTargets: [
+          ...state.recentIncidentTargets,
+          { nodeId: action.nodeId, timestamp: Date.now() }
+        ].slice(-5), // Keep only last 5 targets
+      };
+
+    case 'SPAWN_AI_INCIDENT':
+      return spawnAIIncident(state, action.incident);
 
     case 'NEW_GAME':
       return state; // Handled in App component
@@ -38,6 +58,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'DEBUG_SPAWN_INCIDENT':
       return debugSpawnIncident(state, action.incidentId, action.targetNodeId);
+
+    case 'MITIGATE_INCIDENT':
+      return mitigateIncident(state, action.incidentId, action.actionId);
+
+    case 'EXECUTE_AI_ACTION':
+      return executeAIAction(state, action.actionName, action.cost, action.duration, action.mitigatingIncidentId);
 
     default:
       return state;
@@ -50,54 +76,20 @@ function executeAction(
   rng: SeededRNG,
   mitigatingIncidentId?: string
 ): GameState {
+  
   const actionDef = ACTIONS.find(a => a.id === actionId);
   if (!actionDef) return state;
 
+  // Check cost
+  if (state.cash < actionDef.oneTimeCost) return state;
+
   // Check cooldown
   const cooldownEnd = state.actionCooldowns.get(actionId);
-  if (cooldownEnd && Date.now() < cooldownEnd) {
-    return state;
-  }
-
-  // Check requirements
-  if (actionDef.requires) {
-    const req = actionDef.requires;
-    if (req.minCash && state.cash < req.minCash) return state;
-    if (req.minUsers && state.users < req.minUsers) return state;
-    if (req.nodeEnabled) {
-      const node = state.architecture.nodes.get(req.nodeEnabled);
-      if (!node || !node.enabled) return state;
-    }
-    if (req.observabilityLevel && state.observabilityLevel !== req.observabilityLevel) {
-      return state;
-    }
-  }
-
-  // Check cost
-  if (state.cash < actionDef.oneTimeCost) {
-    return state;
-  }
-
-  // Success check
-  if (!rng.chance(actionDef.successChance)) {
-    // Failed - still pay cost and set cooldown
-    return {
-      ...state,
-      cash: state.cash - actionDef.oneTimeCost,
-      actionCooldowns: new Map(state.actionCooldowns).set(
-        actionId,
-        Date.now() + actionDef.cooldownSeconds * 1000
-      ),
-    };
-  }
+  if (cooldownEnd && Date.now() < cooldownEnd) return state;
 
   const newState = { ...state };
-
-  // Pay cost
   newState.cash -= actionDef.oneTimeCost;
 
-  // Set cooldown
-  newState.actionCooldowns = new Map(newState.actionCooldowns);
   newState.actionCooldowns.set(actionId, Date.now() + actionDef.cooldownSeconds * 1000);
 
   // Apply effects
@@ -157,16 +149,41 @@ function executeAction(
     if (effects.scaleNode) {
       const node = state.architecture.nodes.get(effects.scaleNode.nodeId);
       if (node) {
+        const oldScaling = node.scaling.current;
         const newCurrent = node.scaling.current + effects.scaleNode.delta;
         node.scaling.current = Math.max(
           node.scaling.min,
           Math.min(node.scaling.max, newCurrent)
         );
+        
+        // Log to terminal
+        import('../utils/terminalLog').then(({ tlog }) => {
+          tlog.system(`📊 ${node.name} scaled: ×${oldScaling} → ×${node.scaling.current}`);
+        });
+        
+        // Update component-specific metrics when scaling
+        if (node.specificMetrics) {
+          if ('instances' in node.specificMetrics) {
+            const oldInstances = node.specificMetrics.instances;
+            node.specificMetrics.instances = node.scaling.current;
+            import('../utils/terminalLog').then(({ tlog }) => {
+              tlog.info(`   instances: ${oldInstances} → ${node.specificMetrics.instances}`);
+            });
+          }
+          // Scaling increases capacity, reduces queue backlog
+          if ('queueBacklog' in node.specificMetrics && effects.scaleNode.delta > 0) {
+            const oldBacklog = node.specificMetrics.queueBacklog;
+            node.specificMetrics.queueBacklog = Math.max(0, node.specificMetrics.queueBacklog * 0.7);
+            import('../utils/terminalLog').then(({ tlog }) => {
+              tlog.info(`   queueBacklog: ${oldBacklog} → ${node.specificMetrics.queueBacklog} (-${Math.round((1 - 0.7) * 100)}%)`);
+            });
+          }
+        }
       }
     }
 
     // Downtime risk
-    if (effects.downtimeRisk && rng.chance(effects.downtimeRisk)) {
+    if (effects.downtimeRisk && rng.next() < effects.downtimeRisk) {
       // Cause brief outage
       const targetNode = actionDef.target === 'global'
         ? null
@@ -191,6 +208,16 @@ function executeAction(
 
   // Add action to in-progress if it has duration
   if (actionDef.durationSeconds > 0) {
+    // Apply immediate mitigation when action starts (gives player hope)
+    if (mitigatingIncidentId) {
+      const incident = newState.activeIncidents.find(i => i.id === mitigatingIncidentId);
+      if (incident) {
+        const immediateMitigation = GAME_CONFIG.incidents.immediateMitigationOnActionStart;
+        incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + immediateMitigation);
+        incident.mitigationProgress = incident.mitigationLevel;
+      }
+    }
+    
     newState.actionsInProgress = [
       ...newState.actionsInProgress,
       {
@@ -233,15 +260,110 @@ function mitigateIncident(state: GameState, incidentId: string, actionId: string
   return state;
 }
 
+function executeAIAction(
+  state: GameState,
+  actionName: string,
+  cost: number,
+  duration: number,
+  mitigatingIncidentId: string
+): GameState {
+  // Apply immediate mitigation when AI action starts
+  if (mitigatingIncidentId) {
+    const incident = state.activeIncidents.find(i => i.id === mitigatingIncidentId);
+    if (incident) {
+      const immediateMitigation = GAME_CONFIG.incidents.immediateMitigationOnActionStart;
+      incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + immediateMitigation);
+      incident.mitigationProgress = incident.mitigationLevel;
+      
+      // Apply metric improvements from AI action immediately (partial)
+      const action = incident.aiSuggestedActions?.find(a => a.actionName === actionName);
+      if (action && (action as any).metricImprovements) {
+        const targetNode = state.architecture.nodes.get(incident.targetNodeId);
+        if (targetNode && targetNode.specificMetrics) {
+          const improvements = (action as any).metricImprovements;
+          for (const [metricKey, improvement] of Object.entries(improvements)) {
+            if (metricKey in targetNode.specificMetrics && typeof improvement === 'number') {
+              const currentValue = targetNode.specificMetrics[metricKey];
+              if (typeof currentValue === 'number') {
+                // Apply 30% improvement immediately (rest when action completes)
+                targetNode.specificMetrics[metricKey] = currentValue + (improvement * 0.3);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Check cost
+  if (state.cash < cost) return state;
+
+  const newState = { ...state };
+  newState.cash -= cost;
+
+  // Add to actions in progress
+  newState.actionsInProgress = [
+    ...newState.actionsInProgress,
+    {
+      id: `ai_action_${Date.now()}`,
+      actionId: `ai_${actionName.replace(/\s+/g, '_').toLowerCase()}`,
+      startTime: Date.now(),
+      endTime: Date.now() + duration * 1000,
+      mitigatingIncidentId,
+    },
+  ];
+
+  return newState;
+}
+
+function spawnAIIncident(state: GameState, aiIncident: any): GameState {
+  // Generate truly unique ID using timestamp + random
+  const uniqueId = `ai_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  
+  // Check if similar incident already exists (same AI ID from GPT)
+  const exists = state.activeIncidents.some(i => 
+    i.aiGenerated && (i as any).aiIncidentName === aiIncident.incidentName
+  );
+  
+  if (exists) {
+    console.warn('⚠️ Similar AI incident already active:', aiIncident.incidentName);
+    return state;
+  }
+  
+  const newIncident: ActiveIncident = {
+    id: uniqueId,
+    definitionId: 'ai_generated',
+    targetNodeId: aiIncident.targetNodeId,
+    severity: aiIncident.severity,
+    startTime: Date.now(),
+    escalationTimer: 0,
+    outagetimer: aiIncident.autoResolveSeconds || 300,
+    mitigationLevel: 0,
+    mitigationProgress: 0,
+    aiGenerated: true,
+    aiIncidentName: aiIncident.incidentName,
+    aiDescription: aiIncident.description,
+    aiLogs: aiIncident.logs || '',
+    aiSuggestedActions: aiIncident.suggestedActions,
+    aiEffects: aiIncident.effects,
+    aiCategory: aiIncident.category,
+  };
+  
+  console.log('✅ AI Incident Added:', aiIncident.incidentName);
+  
+  return {
+    ...state,
+    activeIncidents: [...state.activeIncidents, newIncident],
+    totalIncidents: state.totalIncidents + 1,
+  };
+}
+
 function debugSpawnIncident(state: GameState, incidentId: string, targetNodeId: string): GameState {
   const incidentDef = INCIDENTS.find(i => i.id === incidentId);
   if (!incidentDef) return state;
 
-  const targetNode = state.architecture.nodes.get(targetNodeId);
-  if (!targetNode) return state;
-
   const newIncident: ActiveIncident = {
-    id: `incident_${Date.now()}_${Math.random()}`,
+    id: `debug_${Date.now()}`,
     definitionId: incidentId,
     targetNodeId,
     severity: incidentDef.severity,
@@ -258,4 +380,3 @@ function debugSpawnIncident(state: GameState, incidentId: string, targetNodeId: 
     totalIncidents: state.totalIncidents + 1,
   };
 }
-

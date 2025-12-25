@@ -8,7 +8,7 @@ export type ComponentType =
 export type IncidentSeverity = 'INFO' | 'WARN' | 'CRIT';
 export type IncidentCategory = 
   | 'TRAFFIC' | 'SECURITY' | 'DEPLOY' | 'DNS' | 'COMPUTE' 
-  | 'DATABASE' | 'QUEUE' | 'EXTERNAL' | 'OBSERVABILITY';
+  | 'DATABASE' | 'QUEUE' | 'EXTERNAL' | 'OBSERVABILITY' | 'OPTIMIZATION';
 
 export type ObservabilityLevel = 'BASIC' | 'METRICS' | 'TRACES';
 
@@ -47,6 +47,9 @@ export interface ComponentNode {
   
   // State
   operationalMode: 'normal' | 'degraded' | 'down';
+  
+  // Component-specific metrics (detailed metrics for each component type)
+  specificMetrics: Record<string, any>; // Will be typed based on component type
   
   // Features
   features: {
@@ -169,6 +172,20 @@ export interface ActiveIncident {
   outagetimer: number;
   mitigationLevel: number; // 0-1, base completed mitigation
   mitigationProgress: number; // 0-1, includes in-progress action
+  aiGenerated?: boolean; // Is this an AI-generated incident?
+  aiIncidentName?: string; // AI-generated incident name
+  aiDescription?: string; // AI-generated description
+  aiLogs?: string; // AI-generated terminal-style logs
+  aiSuggestedActions?: Array<{
+    actionId?: string;
+    actionName: string;
+    description: string;
+    cost: number;
+    durationSeconds: number;
+    effectiveness: number;
+  }>;
+  aiEffects?: any; // AI-generated effects
+  aiCategory?: string; // AI-generated category (e.g., "OPTIMIZATION")
 }
 
 export interface ActionInProgress {
@@ -189,6 +206,10 @@ export interface GameState {
   hourOfDay: number;
   paused: boolean;
   speed: number; // 1, 2, 4
+  
+  // AI Game Master (always active)
+  aiSessionActive: boolean;
+  recentIncidentTargets: Array<{ nodeId: string; timestamp: number }>; // Track recently targeted nodes
   
   // Architecture
   architecture: Architecture;

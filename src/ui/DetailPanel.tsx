@@ -9,6 +9,7 @@ interface DetailPanelProps {
   selectedIncidentId: string | null;
   onExecuteAction: (actionId: string) => void;
   onMitigateIncident: (incidentId: string, actionId: string) => void;
+  onExecuteAIAction: (actionName: string, cost: number, duration: number, incidentId: string) => void;
 }
 
 export default function DetailPanel({
@@ -17,6 +18,7 @@ export default function DetailPanel({
   selectedIncidentId,
   onExecuteAction,
   onMitigateIncident,
+  onExecuteAIAction,
 }: DetailPanelProps) {
   const [activeTab, setActiveTab] = React.useState<'node' | 'incident' | 'strategy'>('node');
 
@@ -155,6 +157,39 @@ export default function DetailPanel({
                   </div>
                 </div>
 
+                {/* Component-Specific Metrics */}
+                {selectedNode.specificMetrics && (
+                  <div className="specific-metrics">
+                    <h4>📊 Component Metrics</h4>
+                    <div className="metrics-grid">
+                      {Object.entries(selectedNode.specificMetrics).map(([key, value]) => {
+                        // Format the value nicely
+                        let displayValue: string | number = value;
+                        if (typeof value === 'number') {
+                          displayValue = value % 1 === 0 ? value : value.toFixed(2);
+                        } else if (typeof value === 'boolean') {
+                          displayValue = value ? '✓ Enabled' : '✗ Disabled';
+                        } else if (Array.isArray(value)) {
+                          displayValue = value.length > 0 ? value.join(', ') : 'None';
+                        }
+                        
+                        // Format the key (camelCase → Title Case)
+                        const displayKey = key
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/^./, str => str.toUpperCase())
+                          .trim();
+                        
+                        return (
+                          <div key={key} className="metric-item">
+                            <span className="metric-label">{displayKey}:</span>
+                            <span className="metric-value">{displayValue}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <h4>Recommended Actions</h4>
                 <div className="action-list">
                   {ACTIONS.filter(a => a.target === selectedNode.id).slice(0, 5).map(action => {
@@ -188,20 +223,32 @@ export default function DetailPanel({
 
         {activeTab === 'incident' && (
           <div className="tab-content">
-            {selectedIncident && incidentDef ? (
+            {selectedIncident ? (
               <>
-                <h3>{incidentDef.name}</h3>
+                <h3>
+                  {selectedIncident.aiGenerated 
+                    ? ((selectedIncident as any).aiIncidentName || 'AI Incident')
+                    : incidentDef?.name
+                  }
+                </h3>
+                {selectedIncident.aiGenerated && (
+                  <div className="ai-badge">
+                    <span>🤖 AI-Generated Incident</span>
+                  </div>
+                )}
                 <div className="incident-details">
                   <div className="stat-row">
                     <span className="stat-label">Severity:</span>
-                    <span className={`stat-value severity-${incidentDef.severity.toLowerCase()}`}>
-                      {incidentDef.severity}
+                    <span className={`stat-value severity-${selectedIncident.severity.toLowerCase()}`}>
+                      {selectedIncident.severity}
                     </span>
                   </div>
-                  <div className="stat-row">
-                    <span className="stat-label">Category:</span>
-                    <span className="stat-value">{incidentDef.category}</span>
-                  </div>
+                  {!selectedIncident.aiGenerated && (
+                    <div className="stat-row">
+                      <span className="stat-label">Category:</span>
+                      <span className="stat-value">{incidentDef?.category || 'UNKNOWN'}</span>
+                    </div>
+                  )}
                   <div className="stat-row">
                     <span className="stat-label">Target:</span>
                     <span className="stat-value">{selectedIncident.targetNodeId}</span>
@@ -212,20 +259,58 @@ export default function DetailPanel({
                       {(selectedIncident.mitigationProgress * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <p className="incident-description">{incidentDef.description}</p>
+                  <p className="incident-description">
+                    {selectedIncident.aiGenerated 
+                      ? ((selectedIncident as any).aiDescription || 'AI-generated contextual incident')
+                      : (incidentDef?.description || 'No description')
+                    }
+                  </p>
 
                   <h4>Resolution Options</h4>
                   <div className="action-list">
-                    {incidentDef.resolutionOptions.length === 0 ? (
+                    {selectedIncident.aiGenerated && selectedIncident.aiSuggestedActions ? (
+                      // Show AI-suggested actions
+                      selectedIncident.aiSuggestedActions.map((aiAction, idx) => {
+                        const canExecute = state.cash >= aiAction.cost;
+                        const isInProgress = state.actionsInProgress.some(
+                          a => a.actionId === `ai_${aiAction.actionName.replace(/\s+/g, '_').toLowerCase()}` && 
+                               a.mitigatingIncidentId === selectedIncident.id
+                        );
+
+                        return (
+                          <button
+                            key={idx}
+                            className={`action-button resolution ai-action ${isInProgress ? 'in-progress' : ''}`}
+                            onClick={() => onExecuteAIAction(
+                              aiAction.actionName,
+                              aiAction.cost,
+                              aiAction.durationSeconds,
+                              selectedIncident.id
+                            )}
+                            disabled={!canExecute || isInProgress}
+                          >
+                            <div className="action-name">
+                              🤖 {aiAction.actionName}
+                              {isInProgress && ' ⏳'}
+                            </div>
+                            <div className="action-description">{aiAction.description}</div>
+                            <div className="action-cost">
+                              ${aiAction.cost} • {aiAction.durationSeconds}s • {Math.round(aiAction.effectiveness * 100)}% effective
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : !incidentDef || incidentDef.resolutionOptions.length === 0 ? (
                       <p className="no-actions">This incident auto-resolves over time</p>
                     ) : (
-                      incidentDef.resolutionOptions
-                        .filter(actionId => {
-                          // Only show actions that are available (not on long cooldown)
-                          const cooldown = getCooldownRemaining(actionId);
-                          return cooldown < 30; // Only hide if cooldown > 30s
-                        })
-                        .map(actionId => {
+                      <>
+                        {incidentDef && incidentDef.resolutionOptions
+                          .filter(actionId => {
+                            // Only show actions that are available (not on long cooldown)
+                            const cooldown = getCooldownRemaining(actionId);
+                            return cooldown < 30; // Only hide if cooldown > 30s
+                          })
+                          .map(actionId => {
                         const action = ACTIONS.find(a => a.id === actionId);
                         if (!action) return null;
 
@@ -264,7 +349,8 @@ export default function DetailPanel({
                             </div>
                           </button>
                         );
-                      })
+                          })}
+                      </>
                     )}
                   </div>
                 </div>

@@ -20,6 +20,23 @@ export default function ActivityLog({ state }: ActivityLogProps) {
     return Math.max(0, Math.ceil((action.endTime - now) / 1000));
   };
 
+  const getActionName = (action: any): string => {
+    // Check if it's an AI action
+    if (action.actionId.startsWith('ai_')) {
+      // Extract name from ID
+      return action.actionId
+        .replace(/^ai_/, '')
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+    
+    // Regular action
+    const actionDef = ACTIONS.find(a => a.id === action.actionId);
+    return actionDef?.name || 'Unknown Action';
+  };
+
   return (
     <div className="activity-log">
       <div className="activity-header">
@@ -34,16 +51,18 @@ export default function ActivityLog({ state }: ActivityLogProps) {
           </div>
         ) : (
           recentActions.map(action => {
-            const actionDef = ACTIONS.find(a => a.id === action.actionId);
-            if (!actionDef) return null;
-
+            const isAIAction = action.actionId.startsWith('ai_');
+            const actionName = getActionName(action);
             const progress = getProgress(action);
             const timeLeft = getTimeRemaining(action);
 
             return (
-              <div key={action.id} className="activity-item">
+              <div key={action.id} className={`activity-item ${isAIAction ? 'ai-action-item' : ''}`}>
                 <div className="activity-info">
-                  <span className="activity-name">{actionDef.name}</span>
+                  <span className="activity-name">
+                    {isAIAction && '🤖 '}
+                    {actionName}
+                  </span>
                   {action.targetNodeId && (
                     <span className="activity-target">→ {action.targetNodeId}</span>
                   )}

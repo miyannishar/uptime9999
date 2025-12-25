@@ -1,6 +1,21 @@
 // Architecture graph definition
 
 import { ComponentNode, ArchitectureEdge } from '../sim/types';
+import type {
+  DNSMetrics,
+  CDNMetrics,
+  WAFMetrics,
+  LoadBalancerMetrics,
+  APIGatewayMetrics,
+  AppClusterMetrics,
+  CacheMetrics,
+  QueueMetrics,
+  WorkersMetrics,
+  DatabaseMetrics,
+  StorageMetrics,
+  ServiceMeshMetrics,
+  ObservabilityMetrics,
+} from '../sim/componentMetrics';
 
 export function createInitialArchitecture(): {
   nodes: Map<string, ComponentNode>;
@@ -9,6 +24,16 @@ export function createInitialArchitecture(): {
   const nodes = new Map<string, ComponentNode>();
 
   // DNS
+  const dnsMetrics: DNSMetrics = {
+    queriesPerSecond: 0,
+    cacheHitRate: 0.85,
+    ttl: 300,
+    propagationDelay: 5,
+    zonesConfigured: 3,
+    dnssec: true,
+    anycast: true,
+  };
+  
   nodes.set('dns', {
     id: 'dns',
     type: 'DNS',
@@ -29,10 +54,22 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.01,
     operationalMode: 'normal',
+    specificMetrics: dnsMetrics,
     features: {},
   });
 
   // CDN
+  const cdnMetrics: CDNMetrics = {
+    edgeLocations: 15,
+    cacheHitRate: 0.75,
+    bandwidthGbps: 10,
+    cacheSizeGB: 500,
+    ttl: 300,
+    requestsPerSecond: 0,
+    compressionEnabled: true,
+    http2Enabled: true,
+  };
+  
   nodes.set('cdn', {
     id: 'cdn',
     type: 'CDN',
@@ -51,14 +88,26 @@ export function createInitialArchitecture(): {
     errorRate: 0.001,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.05, // Reduced from 0.1
+    costPerSec: 0.05,
     operationalMode: 'normal',
+    specificMetrics: cdnMetrics,
     features: {
       cacheTTL: 300,
     },
   });
 
   // WAF
+  const wafMetrics: WAFMetrics = {
+    requestsPerSecond: 0,
+    blockedRequestsPercent: 0.01,
+    rulesetVersion: '1.0.0',
+    inspectionLatency: 5,
+    falsePositiveRate: 0.001,
+    botProtection: false,
+    rateLimitRPS: 0,
+    geoBlocking: [],
+  };
+  
   nodes.set('waf', {
     id: 'waf',
     type: 'WAF',
@@ -79,13 +128,25 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.15,
     operationalMode: 'normal',
+    specificMetrics: wafMetrics,
     features: {
-      rateLimit: 0, // disabled at start
+      rateLimit: 0,
       botProtection: false,
     },
   });
 
   // Global Load Balancer
+  const glbMetrics: LoadBalancerMetrics = {
+    instances: 1,
+    connectionsPerInstance: 0,
+    maxConnectionsPerInstance: 10000,
+    healthCheckInterval: 5,
+    failedHealthChecks: 0,
+    requestsPerSecond: 0,
+    algorithm: 'round-robin',
+    stickySession: false,
+  };
+  
   nodes.set('glb', {
     id: 'glb',
     type: 'GLB',
@@ -106,10 +167,22 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.2,
     operationalMode: 'normal',
+    specificMetrics: glbMetrics,
     features: {},
   });
 
   // Regional Load Balancer
+  const rlbMetrics: LoadBalancerMetrics = {
+    instances: 1,
+    connectionsPerInstance: 0,
+    maxConnectionsPerInstance: 5000,
+    healthCheckInterval: 3,
+    failedHealthChecks: 0,
+    requestsPerSecond: 0,
+    algorithm: 'least-connections',
+    stickySession: true,
+  };
+  
   nodes.set('rlb', {
     id: 'rlb',
     type: 'RLB',
@@ -130,10 +203,22 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.1,
     operationalMode: 'normal',
+    specificMetrics: rlbMetrics,
     features: {},
   });
 
   // API Gateway
+  const apigwMetrics: APIGatewayMetrics = {
+    requestsPerSecond: 0,
+    concurrentConnections: 0,
+    maxConnections: 5000,
+    rateLimitHitRate: 0.01,
+    transformationLatency: 5,
+    rateLimitingEnabled: false,
+    authenticationMethod: 'jwt',
+    cachingEnabled: false,
+  };
+  
   nodes.set('apigw', {
     id: 'apigw',
     type: 'APIGW',
@@ -146,20 +231,35 @@ export function createInitialArchitecture(): {
     health: 1,
     reliabilityScore: 0.99,
     securityScore: 0.9,
-    scaling: { min: 1, max: 10, current: 1, cooldownUntil: 0 }, // Start with 1 instead of 2
+    scaling: { min: 1, max: 10, current: 1, cooldownUntil: 0 },
     utilization: 0,
     latency: 15,
     errorRate: 0.002,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.2, // Reduced from 0.3
+    costPerSec: 0.2,
     operationalMode: 'normal',
+    specificMetrics: apigwMetrics,
     features: {
       rateLimit: 0,
     },
   });
 
   // App Cluster
+  const appMetrics: AppClusterMetrics = {
+    instances: 2,
+    cpuCoresPerInstance: 4,
+    memoryGBPerInstance: 8,
+    avgCPUPercent: 30,
+    avgMemoryPercent: 40,
+    requestsPerSecond: 0,
+    activeConnections: 0,
+    deploymentVersion: 'v1.0.0',
+    autoscaling: false,
+    minInstances: 2,
+    maxInstances: 50,
+  };
+  
   nodes.set('app', {
     id: 'app',
     type: 'APP',
@@ -172,14 +272,15 @@ export function createInitialArchitecture(): {
     health: 1,
     reliabilityScore: 0.95,
     securityScore: 0.8,
-    scaling: { min: 2, max: 50, current: 2, cooldownUntil: 0 }, // Start with 2 instead of 3
+    scaling: { min: 2, max: 50, current: 2, cooldownUntil: 0 },
     utilization: 0,
     latency: 50,
     errorRate: 0.005,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.3, // Reduced from 0.5
+    costPerSec: 0.3,
     operationalMode: 'normal',
+    specificMetrics: appMetrics,
     features: {
       autoscaling: false,
       circuitBreaker: false,
@@ -189,6 +290,18 @@ export function createInitialArchitecture(): {
   });
 
   // Service Mesh (locked at start)
+  const servicemeshMetrics: ServiceMeshMetrics = {
+    servicesManaged: 5,
+    requestsPerSecond: 0,
+    circuitBreakersOpen: 0,
+    retryRate: 0,
+    mutualTLSPercent: 1.0,
+    sidecarOverhead: 3,
+    tracingEnabled: false,
+    rateLimitingEnabled: false,
+    circuitBreakerEnabled: false,
+  };
+  
   nodes.set('servicemesh', {
     id: 'servicemesh',
     type: 'SERVICE_MESH',
@@ -209,10 +322,25 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.5,
     operationalMode: 'normal',
+    specificMetrics: servicemeshMetrics,
     features: {},
   });
 
   // Cache (Redis)
+  const cacheMetrics: CacheMetrics = {
+    sizeGB: 8,
+    maxSizeGB: 16,
+    hitRate: 0.80,
+    evictionRate: 10,
+    keysStored: 50000,
+    avgTTL: 300,
+    memoryFragmentation: 0.15,
+    connectionsActive: 50,
+    evictionPolicy: 'lru',
+    persistenceEnabled: false,
+    clusteringEnabled: false,
+  };
+  
   nodes.set('cache', {
     id: 'cache',
     type: 'CACHE',
@@ -231,12 +359,26 @@ export function createInitialArchitecture(): {
     errorRate: 0.001,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.1, // Reduced from 0.2
+    costPerSec: 0.1,
     operationalMode: 'normal',
+    specificMetrics: cacheMetrics,
     features: {},
   });
 
   // Queue
+  const queueMetrics: QueueMetrics = {
+    messagesQueued: 0,
+    maxQueueDepth: 10000,
+    enqueuedPerSecond: 0,
+    dequeuedPerSecond: 0,
+    avgMessageAge: 2,
+    deadLetterQueueSize: 0,
+    consumerCount: 1,
+    durability: 'disk',
+    retryPolicy: 'exponential',
+    maxRetries: 3,
+  };
+  
   nodes.set('queue', {
     id: 'queue',
     type: 'QUEUE',
@@ -255,12 +397,26 @@ export function createInitialArchitecture(): {
     errorRate: 0.002,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.08, // Reduced from 0.15
+    costPerSec: 0.08,
     operationalMode: 'normal',
+    specificMetrics: queueMetrics,
     features: {},
   });
 
   // Workers
+  const workersMetrics: WorkersMetrics = {
+    instances: 2,
+    cpuCoresPerWorker: 2,
+    memoryGBPerWorker: 4,
+    jobsProcessedPerSec: 10,
+    avgJobDuration: 10,
+    failedJobsPercent: 0.01,
+    queueBacklog: 0,
+    concurrency: 4,
+    timeout: 300,
+    autoScaling: false,
+  };
+  
   nodes.set('workers', {
     id: 'workers',
     type: 'WORKERS',
@@ -273,18 +429,35 @@ export function createInitialArchitecture(): {
     health: 1,
     reliabilityScore: 0.95,
     securityScore: 0.8,
-    scaling: { min: 1, max: 30, current: 2, cooldownUntil: 0 }, // Start with 2 instead of 3
+    scaling: { min: 1, max: 30, current: 2, cooldownUntil: 0 },
     utilization: 0,
     latency: 100,
     errorRate: 0.01,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.25, // Reduced from 0.4
+    costPerSec: 0.25,
     operationalMode: 'normal',
+    specificMetrics: workersMetrics,
     features: {},
   });
 
   // Database Primary
+  const dbPrimaryMetrics: DatabaseMetrics = {
+    storageGB: 50,
+    maxStorageGB: 500,
+    connections: 20,
+    maxConnections: 100,
+    queriesPerSecond: 0,
+    avgQueryLatency: 20,
+    slowQueriesPercent: 0.05,
+    replicationLag: 0,
+    cacheHitRate: 0.70,
+    indexEfficiency: 0.85,
+    replicationType: 'async',
+    backupsEnabled: true,
+    connectionPoolSize: 100,
+  };
+  
   nodes.set('db_primary', {
     id: 'db_primary',
     type: 'DB_PRIMARY',
@@ -303,8 +476,9 @@ export function createInitialArchitecture(): {
     errorRate: 0.003,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.5, // Reduced from 0.8
+    costPerSec: 0.5,
     operationalMode: 'normal',
+    specificMetrics: dbPrimaryMetrics,
     features: {
       connectionPool: false,
       maxConnections: 100,
@@ -312,6 +486,22 @@ export function createInitialArchitecture(): {
   });
 
   // Database Read Replica (starts with low capacity)
+  const dbReplicaMetrics: DatabaseMetrics = {
+    storageGB: 50,
+    maxStorageGB: 500,
+    connections: 10,
+    maxConnections: 100,
+    queriesPerSecond: 0,
+    avgQueryLatency: 25,
+    slowQueriesPercent: 0.05,
+    replicationLag: 100,
+    cacheHitRate: 0.70,
+    indexEfficiency: 0.85,
+    replicationType: 'async',
+    backupsEnabled: false,
+    connectionPoolSize: 100,
+  };
+  
   nodes.set('db_replica', {
     id: 'db_replica',
     type: 'DB_REPLICA',
@@ -332,10 +522,24 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.4,
     operationalMode: 'normal',
+    specificMetrics: dbReplicaMetrics,
     features: {},
   });
 
   // Object Storage
+  const storageMetrics: StorageMetrics = {
+    storedGB: 100,
+    maxStorageGB: 10000,
+    requestsPerSecond: 0,
+    bandwidthGbps: 1,
+    avgObjectSizeKB: 500,
+    objectCount: 200000,
+    coldStoragePercent: 0.2,
+    replication: 3,
+    lifecycle: true,
+    encryption: true,
+  };
+  
   nodes.set('storage', {
     id: 'storage',
     type: 'OBJECT_STORAGE',
@@ -356,10 +560,25 @@ export function createInitialArchitecture(): {
     loadOut: 0,
     costPerSec: 0.05,
     operationalMode: 'normal',
+    specificMetrics: storageMetrics,
     features: {},
   });
 
   // Observability Stack (global capability)
+  const observabilityMetrics: ObservabilityMetrics = {
+    metricsPerSecond: 1000,
+    logsPerSecond: 500,
+    tracesPerSecond: 0,
+    retentionDays: 7,
+    storageGB: 50,
+    queryLatency: 100,
+    alertsConfigured: 5,
+    dashboardsCount: 3,
+    level: 'BASIC',
+    samplingRate: 0.1,
+    retentionPolicy: '7d',
+  };
+  
   nodes.set('observability', {
     id: 'observability',
     type: 'OBSERVABILITY',
@@ -378,8 +597,9 @@ export function createInitialArchitecture(): {
     errorRate: 0,
     loadIn: 0,
     loadOut: 0,
-    costPerSec: 0.05, // Reduced from 0.1
+    costPerSec: 0.05,
     operationalMode: 'normal',
+    specificMetrics: observabilityMetrics,
     features: {},
   });
 

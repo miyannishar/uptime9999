@@ -4,7 +4,7 @@ export const GAME_CONFIG = {
   // === STARTING STATE ===
   starting: {
     users: 10000,
-    cash: 20000,
+    cash: 4000, // Reduced from 20000 - makes spending decisions meaningful
     pricing: 25, // $ per user per day
     reputation: 80,
     techDebt: 0,
@@ -74,6 +74,15 @@ export const GAME_CONFIG = {
       securityFactor: 0.5,
     },
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
+    // AI Incident effect caps (prevent death spiral)
+    aiEffectCaps: {
+      maxHealthDecayPerSec: 0.003, // Max 0.3% health loss per second per node (even with multiple incidents)
+      maxErrorMultiplier: 3.0, // Cap error multiplier from all incidents combined
+      maxLatencyMultiplier: 2.5, // Cap latency multiplier from all incidents combined
+      maxUtilizationMultiplier: 2.0, // Cap utilization multiplier from all incidents combined
+    },
+    // Immediate mitigation when action starts (gives player hope)
+    immediateMitigationOnActionStart: 0.3, // 30% mitigation applied immediately when action starts
   },
 
   // === ACTION TIMINGS ===

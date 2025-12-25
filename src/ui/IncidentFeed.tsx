@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { ActiveIncident } from '../sim/types';
 import { INCIDENTS } from '../data/incidents';
+import LogsModal from './LogsModal';
 
 interface IncidentFeedProps {
   incidents: ActiveIncident[];
@@ -12,6 +14,16 @@ export default function IncidentFeed({
   onSelectIncident,
   selectedIncidentId,
 }: IncidentFeedProps) {
+  const [logsModalOpen, setLogsModalOpen] = useState(false);
+  const [selectedLogsIncident, setSelectedLogsIncident] = useState<any>(null);
+
+  const handleViewLogs = (incident: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger incident selection
+    setSelectedLogsIncident(incident);
+    setLogsModalOpen(true);
+  };
+  
+
   const formatTime = (timestamp: number): string => {
     const elapsed = Math.floor((Date.now() - timestamp) / 1000);
     if (elapsed < 60) return `${elapsed}s ago`;
@@ -62,23 +74,42 @@ export default function IncidentFeed({
         ) : (
           sortedIncidents.map(incident => {
             const def = INCIDENTS.find(i => i.id === incident.definitionId);
-            if (!def) return null;
+            const displayName = incident.aiGenerated 
+              ? ((incident as any).aiIncidentName || incident.id.replace(/_/g, ' ').replace(/^ai /, ''))
+              : (def?.name || 'Unknown Incident');
 
             return (
               <div
                 key={incident.id}
                 className={`incident-item ${getSeverityClass(incident.severity)} ${
                   selectedIncidentId === incident.id ? 'selected' : ''
-                }`}
-                onClick={() => onSelectIncident(incident.id)}
+                } ${incident.aiGenerated ? 'ai-incident' : ''}`}
+                onClick={() => {
+                  console.log('🔍 Selected incident:', incident.id, incident.aiGenerated ? '(AI)' : '(Regular)');
+                  onSelectIncident(incident.id);
+                }}
               >
                 <div className="incident-header">
-                  <span className="incident-icon">{getSeverityIcon(incident.severity)}</span>
+                  <span className="incident-icon">
+                    {incident.aiGenerated ? '🤖' : getSeverityIcon(incident.severity)}
+                  </span>
                   <span className="incident-severity">{incident.severity}</span>
                   <span className="incident-time">{formatTime(incident.startTime)}</span>
                 </div>
-                <div className="incident-title">{def.name}</div>
+                <div className="incident-title">{displayName}</div>
                 <div className="incident-target">Target: {incident.targetNodeId}</div>
+                
+                {/* View Logs button for AI incidents */}
+                {incident.aiGenerated && (incident as any).aiLogs && (
+                  <button
+                    className="view-logs-button"
+                    onClick={(e) => handleViewLogs(incident, e)}
+                    title="View incident logs"
+                  >
+                    📋 View Logs
+                  </button>
+                )}
+                
                 {incident.mitigationProgress > 0 && (
                   <div className="mitigation-bar">
                     <div
@@ -92,6 +123,15 @@ export default function IncidentFeed({
           })
         )}
       </div>
+      
+      {/* Logs Modal */}
+      {logsModalOpen && selectedLogsIncident && (
+        <LogsModal
+          incidentName={(selectedLogsIncident as any).aiIncidentName || 'Incident'}
+          logs={(selectedLogsIncident as any).aiLogs || 'No logs available'}
+          onClose={() => setLogsModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

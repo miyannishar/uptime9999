@@ -147,6 +147,18 @@ export default function HudBar({
         <button onClick={onLoad} className="hud-button">📂 Load</button>
         <button onClick={onNewGame} className="hud-button">🔄 New Run</button>
 
+        {/* AI Status Indicator (always on) */}
+        <div
+          className={`hud-indicator ${state.aiSessionActive ? 'ai-active' : 'ai-initializing'}`}
+          title={
+            state.aiSessionActive
+              ? 'AI Game Master Active - GPT-4 generating contextual incidents'
+              : 'AI Game Master Initializing...'
+          }
+        >
+          {state.aiSessionActive ? '🤖 AI Active' : '🤖 Initializing...'}
+        </div>
+
         <MusicPlayer />
       </div>
     </div>
