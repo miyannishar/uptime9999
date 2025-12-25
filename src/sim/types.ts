@@ -186,6 +186,8 @@ export interface ActiveIncident {
   }>;
   aiEffects?: any; // AI-generated effects
   aiCategory?: string; // AI-generated category (e.g., "OPTIMIZATION")
+  relatedIncidentIds?: string[]; // IDs of related/linked incidents (same root cause)
+  rootCauseShared?: boolean; // Is this part of a group of related incidents?
 }
 
 export interface ActionInProgress {

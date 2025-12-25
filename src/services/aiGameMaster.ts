@@ -94,7 +94,49 @@ class AIGameMaster {
       return null;
     }
 
-    const prompt = this.buildIncidentPrompt(currentState);
+    // Calculate game progress (0-1, based on elapsed time)
+    // Start easy, ramp up difficulty over 10 minutes (600 seconds)
+    const now = currentState.currentTime || Date.now();
+    const elapsedSeconds = (now - currentState.startTime) / 1000;
+    const gameProgress = Math.min(1.0, elapsedSeconds / 600); // 0 at start, 1.0 after 10 minutes
+
+    // Progressive difficulty: early game = mostly INFO/WARN, late game = more CRIT
+    // Early game (0-2 min): INFO 60%, WARN 35%, CRIT 5%
+    // Mid game (2-5 min): INFO 30%, WARN 50%, CRIT 20%
+    // Late game (5-10 min): INFO 15%, WARN 35%, CRIT 50%
+    const severityRoll = Math.random();
+    let requiredSeverity: 'INFO' | 'WARN' | 'CRIT';
+    
+    if (gameProgress < 0.33) {
+      // Early game (0-2 min): Easy mode
+      if (severityRoll < 0.05) {
+        requiredSeverity = 'CRIT'; // 5% chance
+      } else if (severityRoll < 0.40) {
+        requiredSeverity = 'WARN'; // 35% chance
+      } else {
+        requiredSeverity = 'INFO'; // 60% chance
+      }
+    } else if (gameProgress < 0.83) {
+      // Mid game (2-5 min): Moderate difficulty
+      if (severityRoll < 0.20) {
+        requiredSeverity = 'CRIT'; // 20% chance
+      } else if (severityRoll < 0.70) {
+        requiredSeverity = 'WARN'; // 50% chance
+      } else {
+        requiredSeverity = 'INFO'; // 30% chance
+      }
+    } else {
+      // Late game (5-10+ min): Hard mode
+      if (severityRoll < 0.50) {
+        requiredSeverity = 'CRIT'; // 50% chance
+      } else if (severityRoll < 0.85) {
+        requiredSeverity = 'WARN'; // 35% chance
+      } else {
+        requiredSeverity = 'INFO'; // 15% chance
+      }
+    }
+
+    const prompt = this.buildIncidentPrompt(currentState, requiredSeverity);
     
     // Debug logging for AI communication
     if (import.meta.env.VITE_LOG_LEVEL === 'DEBUG') {
@@ -137,6 +179,13 @@ class AIGameMaster {
       
       if (!incident) {
         console.error('❌ Failed to parse incident from response');
+        return null;
+      }
+      
+      // Ensure incident matches the required severity (AI sometimes ignores instructions)
+      if (incident.severity !== requiredSeverity) {
+        console.warn(`⚠️ AI returned severity ${incident.severity} but we requested ${requiredSeverity}, correcting...`);
+        incident.severity = requiredSeverity;
       }
       
       return incident;
@@ -237,6 +286,13 @@ INCIDENT GENERATION RULES:
   * For QUEUE incidents: Affect messagesQueued, avgMessageAge, deadLetterQueueSize
    * Example: Cache incident → "metricEffects": { "hitRate": -0.25, "evictionRate": 100 }
    * NOTE: Use plain numbers in JSON (100, -50), NOT unary + (+100) - JSON doesn't support it!
+   * IMPORTANT: Keep metric effect values REALISTIC and SMALL:
+   * - hitRate changes: -0.1 to -0.3 (small decrements)
+   * - connections: 5-20 (small increments, not thousands!)
+   * - evictionRate: 10-100 keys/sec (reasonable range)
+   * - CPU/Memory percent: 5-15 (small increments)
+   * - queueBacklog: 50-200 (small increments, not millions!)
+   * These effects accumulate over time, so keep them SMALL!
 
 RESPONSE FORMAT:
 Always respond in valid JSON format with this structure:
@@ -312,7 +368,7 @@ You have access to the full conversation history. Use it to:
 Be creative, realistic, and fair. Make the game challenging but fun!`;
   }
 
-  private buildIncidentPrompt(state: GameState): string {
+  private buildIncidentPrompt(state: GameState, requiredSeverity: 'INFO' | 'WARN' | 'CRIT'): string {
     // Identify bottlenecks for AI context
     const bottlenecks = Array.from(state.architecture.nodes.values())
       .filter(n => n.enabled && (n.utilization > 0.8 || n.errorRate > 0.1 || n.health < 0.5))
@@ -337,11 +393,26 @@ ${this.serializeGameState(state)}
 BOTTLENECK ANALYSIS:
 ${bottlenecks ? `⚠️ Potential bottlenecks: ${bottlenecks}` : '✅ System healthy'}
 
+ACTIVE INCIDENTS (Avoid duplicates):
+${state.activeIncidents.length > 0 
+  ? state.activeIncidents.map(i => `- ${i.targetNodeId}: ${i.aiGenerated ? (i as any).aiIncidentName : 'incident'} (${i.severity})`).join('\n')
+  : 'None - system is clean'
+}
+
 RECENTLY TARGETED NODES (AVOID):
 ${recentTargets.length > 0 ? `❌ ${recentTargets.join(', ')} - targeted recently, try different nodes` : 'None'}
 
 STRENGTHENED NODES (LOW PRIORITY):
 ${strengthenedNodes || 'None scaled yet'}
+
+⚡ **REQUIRED SEVERITY: ${requiredSeverity}** ⚡
+You MUST generate an incident with severity="${requiredSeverity}". DO NOT CHANGE THIS!
+${requiredSeverity === 'CRIT'
+  ? 'This should be a SERIOUS threat requiring immediate action (e.g., connection pool exhausted, OOM, critical queue backlog, system outage risk).'
+  : requiredSeverity === 'WARN'
+  ? 'This should be a moderate problem requiring attention (e.g., DB connections 80/100, cache hit rate 60%, high utilization).'
+  : 'This should be a minor issue OR a profit optimization opportunity (category "OPTIMIZATION"). No significant negative effects.'
+}
 
 CRITICAL RULES - FOLLOW STRICTLY:
 
@@ -394,15 +465,15 @@ CRITICAL RULES - FOLLOW STRICTLY:
 6. **DIVERSIFY**: Recently targeted: ${recentTargets.join(', ') || 'none'} - CHOOSE DIFFERENT NODE!
 
 YOUR TASK:
-Generate ONE SPECIFIC, CREATIVE incident:
+Generate ONE SPECIFIC, CREATIVE incident with severity="${requiredSeverity}":
+- **MANDATORY**: Use severity="${requiredSeverity}" (DO NOT CHANGE THIS!)
 - ❌ NO GENERIC "High Latency" / "High Error Rate" incidents!
 - ✅ BE CREATIVE: Memory leaks, connection exhaustion, cache thrashing, zombie processes, etc.
-- ✅ PROFIT OPPORTUNITIES (20% of INFO incidents): Suggest cost reductions/efficiency improvements that INCREASE profit/min WITHOUT degrading system
+${requiredSeverity === 'INFO' ? '- ✅ For INFO: Minor issues OR profit optimization opportunities (category "OPTIMIZATION" with NO negative effects)' : ''}
 - Target node NOT in: ${recentTargets.join(', ') || 'none'}
 - Check nodeMetrics for ACTUAL problems (queue backlog, connection pool, hit rate, CPU%) OR opportunities (low utilization = can save costs)
-- Vary severity: Look at metrics - if critical → CRIT, if moderate → WARN, if minor → INFO, if opportunity → INFO (optimization)
 - Include 2-4 SPECIFIC actions that directly improve metrics (no "monitor" or "review")
-- For optimization opportunities: Use category "OPTIMIZATION", NO negative metricEffects, suggest actions that save costs or improve efficiency
+- For INFO/OPTIMIZATION opportunities: Use category "OPTIMIZATION", NO negative metricEffects, suggest actions that save costs or improve efficiency
 
 EXAMPLES OF GOOD INCIDENTS:
 - Redis Memory Leak - 12GB Used with 95% Fragmentation
@@ -551,11 +622,11 @@ Respond ONLY with JSON, no markdown formatting.`;
       content: logMessage,
     });
     
-    // Keep history manageable - trim to last 10 messages to avoid context window issues
-    if (this.conversationHistory.length > 11) { // Keep system + 10 messages
+    // Keep history manageable - trim to last 20 messages to avoid context window issues
+    if (this.conversationHistory.length > 21) { // Keep system + 20 messages
       this.conversationHistory = [
         this.conversationHistory[0], // Keep system prompt
-        ...this.conversationHistory.slice(-10),
+        ...this.conversationHistory.slice(-20),
       ];
     }
   }

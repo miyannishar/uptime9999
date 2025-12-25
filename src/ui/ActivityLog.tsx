@@ -6,13 +6,14 @@ interface ActivityLogProps {
 }
 
 export default function ActivityLog({ state }: ActivityLogProps) {
-  const recentActions = [...state.actionsInProgress].reverse().slice(0, 10);
+  const recentActions = [...state.actionsInProgress].reverse().slice(0, 20);
 
   const getProgress = (action: any): number => {
     const now = Date.now();
-    const elapsed = now - action.startTime;
+    const elapsed = Math.max(0, now - action.startTime);
     const total = action.endTime - action.startTime;
-    return Math.min(100, (elapsed / total) * 100);
+    // Return progress as 0-1.0 (same as incident mitigationProgress calculation)
+    return Math.min(1.0, elapsed / total);
   };
 
   const getTimeRemaining = (action: any): number => {
@@ -71,7 +72,7 @@ export default function ActivityLog({ state }: ActivityLogProps) {
                 <div className="activity-progress-bar">
                   <div
                     className="activity-progress-fill"
-                    style={{ width: `${progress}%` }}
+                    style={{ width: `${progress * 100}%` }}
                   ></div>
                 </div>
               </div>

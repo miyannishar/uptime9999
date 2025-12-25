@@ -16,6 +16,7 @@ import {
 import { INCIDENTS } from '../data/incidents';
 import { createInitialArchitecture } from '../data/architecture';
 import { GAME_CONFIG } from '../config/gameConfig';
+import { clampMetric, clampAllMetrics } from './clampMetrics';
 
 export function createInitialState(seed: string): GameState {
   const architecture = createInitialArchitecture();
@@ -253,14 +254,32 @@ function applyIncidentEffects(state: GameState, dt: number) {
         }
         
         // Apply component-specific metric effects
+        // IMPORTANT: Effects are applied gradually over time, not instantly
+        // AI provides "target change" values, we apply them gradually over seconds
         if (aiEffects.metricEffects && targetNode.specificMetrics) {
           for (const [metricKey, effectValue] of Object.entries(aiEffects.metricEffects)) {
             if (metricKey in targetNode.specificMetrics) {
               const currentValue = targetNode.specificMetrics[metricKey];
               if (typeof currentValue === 'number' && typeof effectValue === 'number') {
-                // Apply effect with mitigation factor
-                const effectiveChange = effectValue * mitigationFactor;
-                targetNode.specificMetrics[metricKey] = Math.max(0, currentValue + effectiveChange);
+                // Clamp effect value to reasonable bounds first
+                let clampedEffect = effectValue;
+                if (metricKey.includes('Percent') || metricKey === 'avgCPUPercent' || metricKey === 'avgMemoryPercent') {
+                  clampedEffect = Math.max(-50, Math.min(50, effectValue)); // Max ±50% change
+                } else if (metricKey === 'connections' || metricKey === 'concurrentConnections') {
+                  clampedEffect = Math.max(-100, Math.min(100, effectValue)); // Max ±100 connections
+                } else if (metricKey === 'evictionRate') {
+                  clampedEffect = Math.max(-500, Math.min(500, effectValue)); // Max ±500 keys/sec
+                } else if (metricKey === 'queueBacklog' || metricKey === 'messagesQueued') {
+                  clampedEffect = Math.max(-5000, Math.min(5000, effectValue)); // Max ±5k messages
+                } else if (metricKey === 'hitRate' || metricKey.includes('Rate')) {
+                  clampedEffect = Math.max(-0.5, Math.min(0.5, effectValue)); // Max ±0.5 (50%)
+                }
+                
+                // Apply gradually over time (effectValue represents target change over ~10 seconds)
+                // So we apply 10% of the effect per second
+                const effectiveChange = (clampedEffect * 0.1) * mitigationFactor * dt;
+                const newValue = currentValue + effectiveChange;
+                targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
               }
             }
           }
@@ -393,7 +412,15 @@ function applyIncidentEffects(state: GameState, dt: number) {
     if (healthDecay) {
       const cappedDecay = Math.min(healthDecay, caps.maxHealthDecayPerSec);
       node.health = Math.max(0, node.health - cappedDecay * dt);
+    } else if (node.health < 1.0) {
+      // Natural health recovery when no incidents are affecting this node
+      // Recover 5% health per second (slower if under load)
+      const recoveryRate = 0.05 * (1 - Math.min(0.7, node.utilization));
+      node.health = Math.min(1.0, node.health + recoveryRate * dt);
     }
+    
+    // Clamp all metrics to prevent unrealistic values
+    clampAllMetrics(node);
   });
 }
 
@@ -595,6 +622,22 @@ function updateActions(state: GameState, _dt: number) {
           incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + mitigationPerAction);
           incident.mitigationProgress = incident.mitigationLevel;
           
+          // Apply FULL mitigation to related incidents (shared root cause = same fix works for all!)
+          if (incident.relatedIncidentIds && incident.relatedIncidentIds.length > 0) {
+            const sharedMitigation = mitigationPerAction; // 100% mitigation for related incidents (same root cause!)
+            const linkedIds = incident.relatedIncidentIds; // Store in const for TypeScript
+            linkedIds.forEach(relatedId => {
+              const relatedIncident = state.activeIncidents.find(i => i.id === relatedId);
+              if (relatedIncident) {
+                relatedIncident.mitigationLevel = Math.min(1.0, relatedIncident.mitigationLevel + sharedMitigation);
+                relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
+              }
+            });
+            import('../utils/terminalLog').then(({ tlog }) => {
+              tlog.success(`🔗 Fully mitigated ${linkedIds.length} related incident(s) (100% - shared root cause!)`);
+            });
+          }
+          
           // Apply remaining metric improvements from AI actions (70% on completion)
           if (action.actionId.startsWith('ai_') && incident.aiSuggestedActions) {
             const actionName = action.actionId.replace(/^ai_/, '').replace(/_/g, ' ');
@@ -621,16 +664,8 @@ function updateActions(state: GameState, _dt: number) {
                         const finalImprovement = improvement * 0.7;
                         let newValue = currentValue + finalImprovement;
                         
-                        // Clamp values appropriately
-                        if (metricKey.includes('Percent') || metricKey.includes('Rate') || metricKey === 'hitRate') {
-                          newValue = Math.max(0, Math.min(1, newValue)); // Rates: 0-1
-                        } else if (metricKey.includes('GB') || metricKey.includes('connections') || metricKey.includes('instances')) {
-                          newValue = Math.max(0, Math.round(newValue)); // Whole numbers
-                        } else {
-                          newValue = Math.max(0, newValue); // Just positive
-                        }
-                        
-                        targetNode.specificMetrics[metricKey] = newValue;
+                        // Use proper clampMetric function
+                        targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
                         
                         // Log to terminal
                         const change = newValue - currentValue;

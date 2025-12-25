@@ -51,8 +51,8 @@ export default function DetailPanel({
     const action = ACTIONS.find(a => a.id === actionId);
     if (!action) return false;
 
-    // Check cash
-    if (state.cash < action.oneTimeCost) return false;
+    // Check cash (only for positive costs - negative costs add money)
+    if (action.oneTimeCost > 0 && state.cash < action.oneTimeCost) return false;
 
     // Check cooldown
     const cooldownEnd = state.actionCooldowns.get(actionId);
@@ -61,11 +61,22 @@ export default function DetailPanel({
     // Check requirements
     if (action.requires) {
       const req = action.requires;
-      if (req.minCash && state.cash < req.minCash) return false;
-      if (req.minUsers && state.users < req.minUsers) return false;
+      if (req.minCash !== undefined && state.cash < req.minCash) return false;
+      if (req.minUsers !== undefined && state.users < req.minUsers) return false;
       if (req.nodeEnabled) {
         const node = state.architecture.nodes.get(req.nodeEnabled);
         if (!node || !node.enabled) return false;
+      }
+      if (req.featureEnabled) {
+        // Check if feature is enabled on any node
+        let featureFound = false;
+        for (const node of state.architecture.nodes.values()) {
+          if ((node.features as any)[req.featureEnabled]) {
+            featureFound = true;
+            break;
+          }
+        }
+        if (!featureFound) return false;
       }
       if (req.observabilityLevel && state.observabilityLevel !== req.observabilityLevel) {
         return false;
@@ -259,12 +270,59 @@ export default function DetailPanel({
                       {(selectedIncident.mitigationProgress * 100).toFixed(0)}%
                     </span>
                   </div>
+                  {/* Progress bar matching activity log */}
+                  {selectedIncident.mitigationProgress > 0 && (
+                    <div className="mitigation-bar" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                      <div
+                        className="mitigation-fill"
+                        style={{ width: `${selectedIncident.mitigationProgress * 100}%` }}
+                      ></div>
+                    </div>
+                  )}
+                  {selectedIncident.relatedIncidentIds && selectedIncident.relatedIncidentIds.length > 0 && (
+                    <div className="stat-row related-incidents-indicator">
+                      <span className="stat-label">🔗 Related:</span>
+                      <span className="stat-value">
+                        {selectedIncident.relatedIncidentIds.length} linked incident{selectedIncident.relatedIncidentIds.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
                   <p className="incident-description">
                     {selectedIncident.aiGenerated 
                       ? ((selectedIncident as any).aiDescription || 'AI-generated contextual incident')
                       : (incidentDef?.description || 'No description')
                     }
                   </p>
+
+                  {/* Show related incidents if any */}
+                  {selectedIncident.relatedIncidentIds && selectedIncident.relatedIncidentIds.length > 0 && (
+                    <div className="related-incidents-section">
+                      <h4>🔗 Related Incidents (Shared Root Cause)</h4>
+                      <div className="related-incidents-list">
+                        {selectedIncident.relatedIncidentIds.map(relatedId => {
+                          const relatedIncident = state.activeIncidents.find(i => i.id === relatedId);
+                          if (!relatedIncident) return null;
+                          const relatedName = relatedIncident.aiGenerated 
+                            ? ((relatedIncident as any).aiIncidentName || 'Related Incident')
+                            : INCIDENTS.find(i => i.id === relatedIncident.definitionId)?.name || 'Related Incident';
+                          return (
+                            <div key={relatedId} className="related-incident-item">
+                              <span className={`severity-badge severity-${relatedIncident.severity.toLowerCase()}`}>
+                                {relatedIncident.severity}
+                              </span>
+                              <span className="related-incident-name">{relatedName}</span>
+                              <span className="related-incident-progress">
+                                {(relatedIncident.mitigationProgress * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="related-incidents-note">
+                        💡 Fixing this incident will fully resolve all related incidents (shared root cause)
+                      </p>
+                    </div>
+                  )}
 
                   <h4>Resolution Options</h4>
                   <div className="action-list">
