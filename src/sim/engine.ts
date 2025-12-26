@@ -168,9 +168,18 @@ function propagateLoad(state: GameState, ingressRPS: number) {
     current.latency = computeLatency(current.baseLatency, utilization);
     current.errorRate = computeErrorRate(current.baseError, utilization, current.health);
 
-    // Update operational mode
+    // Update operational mode and play sound if critical node goes down
+    const previousMode = current.operationalMode;
+    const isCriticalNode = ['dns', 'app', 'db_primary'].includes(currentId);
+    
     if (current.health < 0.3 || utilization > 3) {
       current.operationalMode = 'down';
+      // Play sound when critical node transitions to down (but not if it was already down)
+      if (previousMode !== 'down' && isCriticalNode) {
+        import('../utils/soundNotifications').then(({ soundNotifications }) => {
+          soundNotifications.playSystemDown();
+        });
+      }
     } else if (current.health < 0.7 || utilization > 1.5) {
       current.operationalMode = 'degraded';
     } else {
@@ -607,6 +616,11 @@ function updateActions(state: GameState, _dt: number) {
   // Remove completed actions and finalize their mitigation
   state.actionsInProgress = state.actionsInProgress.filter(action => {
     if (now >= action.endTime) {
+      // Play completion sound
+      import('../utils/soundNotifications').then(({ soundNotifications }) => {
+        soundNotifications.playActionComplete();
+      });
+      
       // Use dynamic import for terminal logger
       import('../utils/terminalLog').then(({ tlog }) => {
         tlog.success('═══════════════════════════════════════════════');

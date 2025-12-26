@@ -2,7 +2,6 @@ import React, { useReducer, useEffect, useRef, useState } from 'react';
 import { createInitialState, tickSimulation } from './sim/engine';
 import { gameReducer } from './sim/reducer';
 import { SeededRNG, generateSeed } from './sim/rng';
-import { saveGame, loadGame, hasSavedGame } from './utils/saveLoad';
 import { initializeAIGameMaster, getAIGameMaster } from './services/aiGameMaster';
 import { ACTIONS } from './data/actions';
 
@@ -12,6 +11,7 @@ import ArchMap from './ui/ArchMap';
 import DetailPanel from './ui/DetailPanel';
 import ActionBar from './ui/ActionBar';
 import ActivityLog from './ui/ActivityLog';
+import LoadingScreen from './ui/LoadingScreen';
 import { tlog, isDebug } from './utils/terminalLog';
 import GameOverModal from './ui/GameOverModal';
 import { useResizable } from './hooks/useResizable';
@@ -106,21 +106,22 @@ function App() {
     }
   }, [state.aiSessionActive]);
 
-  // Game loop
+  // Game loop - only run when AI is active
   useEffect(() => {
+    if (!state.aiSessionActive) return;
+    
     let lastTick = Date.now();
-    let autosaveCounter = 0;
 
     const interval = setInterval(async () => {
       const currentState = stateRef.current;
       
-      if (currentState.paused || currentState.gameOver) return;
+      if (currentState.paused || currentState.gameOver || !currentState.aiSessionActive) return;
 
       const now = Date.now();
       const realDt = (now - lastTick) / 1000;
       lastTick = now;
 
-      const dt = realDt * currentState.speed;
+      const dt = realDt; // Removed speed multiplier - always runs at real-time
 
       // Tick simulation - this creates a new state based on the LATEST state
       const newState = tickSimulation(currentState, rngRef.current, dt);
@@ -206,19 +207,12 @@ function App() {
         }
       }
       
-      // Autosave every 30s
-      autosaveCounter += realDt;
-      if (autosaveCounter >= 30) {
-        saveGame(newState, true);
-        autosaveCounter = 0;
-      }
-
       // Update state through dispatch
       dispatch({ type: 'LOAD_GAME', state: newState });
     }, 100); // 100ms tick
 
     return () => clearInterval(interval);
-  }, []); // Empty deps - run once and use ref for latest state
+  }, [state.aiSessionActive]); // Only run when AI is active
 
   // Check game over
   useEffect(() => {
@@ -236,28 +230,12 @@ function App() {
     setShowGameOver(false);
     setSelectedNode(null);
     setSelectedIncident(null);
-  };
-
-  const handleLoadGame = () => {
-    const loaded = loadGame(false);
-    if (loaded) {
-      setSeed(loaded.seed);
-      rngRef.current = new SeededRNG(loaded.seed);
-      dispatch({ type: 'LOAD_GAME', state: loaded });
-      setShowGameOver(false);
-    }
-  };
-
-  const handleSaveGame = () => {
-    saveGame(state, false);
+    // Reset AI session
+    dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
   };
 
   const handleTogglePause = () => {
     dispatch({ type: 'TOGGLE_PAUSE' });
-  };
-
-  const handleSetSpeed = (speed: number) => {
-    dispatch({ type: 'SET_SPEED', speed });
   };
 
   const handleExecuteAction = (actionId: string, mitigatingIncidentId?: string) => {
@@ -293,18 +271,17 @@ function App() {
     }
   };
 
-  // AI is always on - no toggle needed
+  // Show loading screen while AI is initializing
+  if (!state.aiSessionActive) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="app">
       <HudBar
         state={state}
         onTogglePause={handleTogglePause}
-        onSetSpeed={handleSetSpeed}
-        onSave={handleSaveGame}
-        onLoad={handleLoadGame}
         onNewGame={handleNewGame}
-        hasAutosave={hasSavedGame(true)}
       />
 
       <div className="main-layout">

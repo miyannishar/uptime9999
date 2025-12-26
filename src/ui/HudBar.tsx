@@ -4,19 +4,12 @@ import MusicPlayer from './MusicPlayer';
 interface HudBarProps {
   state: GameState;
   onTogglePause: () => void;
-  onSetSpeed: (speed: number) => void;
-  onSave: () => void;
-  onLoad: () => void;
   onNewGame: () => void;
-  hasAutosave: boolean;
 }
 
 export default function HudBar({
   state,
   onTogglePause,
-  onSetSpeed,
-  onSave,
-  onLoad,
   onNewGame,
 }: HudBarProps) {
   const formatNumber = (num: number): string => {
@@ -122,42 +115,7 @@ export default function HudBar({
           {state.paused ? '▶ Play' : '⏸ Pause'}
         </button>
 
-        <div className="speed-controls">
-          <button
-            onClick={() => onSetSpeed(1)}
-            className={`speed-button ${state.speed === 1 ? 'active' : ''}`}
-          >
-            1x
-          </button>
-          <button
-            onClick={() => onSetSpeed(2)}
-            className={`speed-button ${state.speed === 2 ? 'active' : ''}`}
-          >
-            2x
-          </button>
-          <button
-            onClick={() => onSetSpeed(4)}
-            className={`speed-button ${state.speed === 4 ? 'active' : ''}`}
-          >
-            4x
-          </button>
-        </div>
-
-        <button onClick={onSave} className="hud-button">💾 Save</button>
-        <button onClick={onLoad} className="hud-button">📂 Load</button>
         <button onClick={onNewGame} className="hud-button">🔄 New Run</button>
-
-        {/* AI Status Indicator (always on) */}
-        <div
-          className={`hud-indicator ${state.aiSessionActive ? 'ai-active' : 'ai-initializing'}`}
-          title={
-            state.aiSessionActive
-              ? 'AI Game Master Active - GPT-4 generating contextual incidents'
-              : 'AI Game Master Initializing...'
-          }
-        >
-          {state.aiSessionActive ? '🤖 AI Active' : '🤖 Initializing...'}
-        </div>
 
         <MusicPlayer />
       </div>

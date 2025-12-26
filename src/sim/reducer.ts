@@ -6,6 +6,7 @@ import { ACTIONS } from '../data/actions';
 import { INCIDENTS } from '../data/incidents';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric } from './clampMetrics';
+import { soundNotifications } from '../utils/soundNotifications';
 
 export type GameAction =
   | { type: 'TICK'; dt: number; rng: SeededRNG }
@@ -295,6 +296,9 @@ function executeAction(
     newState.pricing *= 1.2;
   }
 
+  // Play sound when action starts
+  soundNotifications.playActionStart();
+
   // Add action to in-progress if it has duration (including node actions from node tab!)
   // This ensures all actions (incident mitigation, node scaling, etc.) appear in activity log
   if (actionDef.durationSeconds > 0) {
@@ -429,6 +433,9 @@ function executeAIAction(
   // Check cost
   if (state.cash < cost) return state;
 
+  // Play sound when action starts
+  soundNotifications.playActionStart();
+
   const newState = { ...state };
   newState.cash -= cost;
 
@@ -512,6 +519,15 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
   }
   
   console.log('✅ AI Incident Added:', aiIncident.incidentName);
+  
+  // Play sound based on severity
+  if (aiIncident.severity === 'CRIT') {
+    soundNotifications.playIncidentCRIT();
+  } else if (aiIncident.severity === 'WARN') {
+    soundNotifications.playIncidentWARN();
+  } else {
+    soundNotifications.playIncidentINFO();
+  }
   
   return {
     ...state,
