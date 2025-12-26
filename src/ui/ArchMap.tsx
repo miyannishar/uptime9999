@@ -316,7 +316,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 152}
                   fill="#00ffaa"
                   fontSize="20"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   fontWeight="600"
                 >
                   H:{Math.round(healthPercent)}%
@@ -328,7 +328,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 152}
                   fill="#00aaff"
                   fontSize="20"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   textAnchor="middle"
                   fontWeight="600"
                 >
@@ -341,7 +341,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 152}
                   fill={utilizationPercent > 80 ? '#ffaa00' : '#00ffaa'}
                   fontSize="20"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   textAnchor="end"
                   fontWeight="600"
                 >
@@ -357,7 +357,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 180}
                   fill="#00ffaa"
                   fontSize="18"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   fontWeight="600"
                 >
                   ×{node.scaling.current}
@@ -369,7 +369,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 180}
                   fill={node.errorRate > 0.1 ? '#ff3366' : '#888'}
                   fontSize="18"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   textAnchor="middle"
                   fontWeight="600"
                 >
@@ -382,7 +382,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   y={pos.y + 180}
                   fill={node.latency > 500 ? '#ffaa00' : '#888'}
                   fontSize="18"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                   textAnchor="end"
                   fontWeight="600"
                 >
