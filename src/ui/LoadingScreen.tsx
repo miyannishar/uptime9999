@@ -13,7 +13,7 @@ export default function LoadingScreen() {
           <div className="spinner-ring"></div>
         </div>
         <div className="loading-text">
-          <p className="loading-title">Initializing AI Game Master...</p>
+          <p className="loading-title">Initializing The Game Master...</p>
           <p className="loading-subtitle">Preparing your infrastructure simulation</p>
         </div>
       </div>

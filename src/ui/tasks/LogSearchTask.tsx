@@ -13,6 +13,8 @@ export default function LogSearchTask({
 }: LogSearchTaskProps) {
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterLevel, setFilterLevel] = useState<'all' | 'error' | 'warn'>('all');
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +41,17 @@ export default function LogSearchTask({
     }
   };
 
+  // Filter logs based on search and level
+  const filteredLogs = logs
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => {
+      const matchesSearch = !searchQuery || line.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesLevel = filterLevel === 'all' || 
+        (filterLevel === 'error' && line.includes('ERROR')) ||
+        (filterLevel === 'warn' && line.includes('WARN'));
+      return matchesSearch && matchesLevel;
+    });
+
   return (
     <div className="task-container log-search-task">
       <h3>🔍 Find the Error in Logs</h3>
@@ -52,19 +65,61 @@ export default function LogSearchTask({
         </div>
       </div>
 
-      <div className="log-viewer" ref={logContainerRef}>
-        {logs.map((line, index) => (
-          <div
-            key={index}
-            className={`log-line ${selectedLine === index ? 'selected' : ''} ${
-              line.includes('ERROR') ? 'log-error' : line.includes('WARN') ? 'log-warn' : ''
-            }`}
-            onClick={() => handleLineClick(index, line)}
+      {/* Interactive Search & Filter Controls */}
+      <div className="log-controls">
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="🔍 Search logs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="log-search-input"
+          />
+        </div>
+        <div className="filter-buttons">
+          <button
+            className={`filter-btn ${filterLevel === 'all' ? 'active' : ''}`}
+            onClick={() => setFilterLevel('all')}
           >
-            <span className="line-number">{String(index + 1).padStart(4, '0')}</span>
-            <span className="line-content">{line}</span>
+            All
+          </button>
+          <button
+            className={`filter-btn ${filterLevel === 'error' ? 'active' : ''}`}
+            onClick={() => setFilterLevel('error')}
+          >
+            ERROR
+          </button>
+          <button
+            className={`filter-btn ${filterLevel === 'warn' ? 'active' : ''}`}
+            onClick={() => setFilterLevel('warn')}
+          >
+            WARN
+          </button>
+        </div>
+        {filteredLogs.length !== logs.length && (
+          <div className="filter-info">
+            Showing {filteredLogs.length} of {logs.length} logs
           </div>
-        ))}
+        )}
+      </div>
+
+      <div className="log-viewer" ref={logContainerRef}>
+        {filteredLogs.length === 0 ? (
+          <div className="no-logs">No logs match your search/filter</div>
+        ) : (
+          filteredLogs.map(({ line, index }) => (
+            <div
+              key={index}
+              className={`log-line ${selectedLine === index ? 'selected' : ''} ${
+                line.includes('ERROR') ? 'log-error' : line.includes('WARN') ? 'log-warn' : ''
+              }`}
+              onClick={() => handleLineClick(index, line)}
+            >
+              <span className="line-number">{String(index + 1).padStart(4, '0')}</span>
+              <span className="line-content">{line}</span>
+            </div>
+          ))
+        )}
       </div>
 
       {error && <div className="task-error">{error}</div>}
