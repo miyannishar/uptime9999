@@ -21,7 +21,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
   const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
 
   // Layout positions for nodes (hand-crafted for clarity, scaled up significantly with more spacing)
-  const positions: Record<string, { x: number; y: number }> = {
+  const basePositions: Record<string, { x: number; y: number }> = {
     dns: { x: 200, y: 100 },
     cdn: { x: 200, y: 340 },
     waf: { x: 200, y: 580 },
@@ -37,7 +37,56 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
     db_replica: { x: 1550, y: 820 },
     storage: { x: 1100, y: 1780 },
     observability: { x: 650, y: 100 },
+    // Dynamic services
+    auth: { x: 650, y: 1540 },
+    payment: { x: 650, y: 1780 },
+    notification: { x: 650, y: 2020 },
+    search: { x: 1550, y: 1300 },
+    message_bus: { x: 1100, y: 2020 },
+    db_pooler: { x: 1100, y: 820 },
+    reverse_proxy: { x: 200, y: 1060 },
   };
+
+  // Calculate positions for all nodes (including dynamic instances)
+  const positions: Record<string, { x: number; y: number }> = {};
+  
+  // Group nodes by base type for stacking instances
+  const nodeGroups = new Map<string, Array<{ id: string; instanceNumber?: number }>>();
+  
+  Array.from(nodes.values()).forEach(node => {
+    const baseId = node.id.split('_')[0]; // Get base ID (e.g., 'app' from 'app_2')
+    if (!nodeGroups.has(baseId)) {
+      nodeGroups.set(baseId, []);
+    }
+    nodeGroups.get(baseId)!.push({ id: node.id, instanceNumber: node.instanceNumber });
+  });
+  
+  // Assign positions - stack instances vertically
+  nodeGroups.forEach((instances, baseId) => {
+    const basePos = basePositions[baseId] || basePositions[instances[0]?.id] || { x: 200, y: 200 };
+    
+    instances.forEach((instance, idx) => {
+      if (instance.instanceNumber && instance.instanceNumber > 1) {
+        // Stack additional instances to the right
+        positions[instance.id] = {
+          x: basePos.x + (idx * 120), // Horizontal offset for each instance
+          y: basePos.y,
+        };
+      } else {
+        // First instance uses base position
+        positions[instance.id] = basePos;
+      }
+    });
+  });
+  
+  // Fallback for any nodes without positions
+  Array.from(nodes.values()).forEach(node => {
+    if (!positions[node.id]) {
+      // Try to find base position or use default
+      const baseId = node.id.split('_')[0];
+      positions[node.id] = basePositions[baseId] || basePositions[node.id] || { x: 200, y: 200 };
+    }
+  });
 
   const getNodeStatus = (node: any): string => {
     if (!node.enabled) return 'disabled';
@@ -58,6 +107,133 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
       case 'disabled': return '#444444';
       default: return '#00ff88';
     }
+  };
+
+  // Render component-specific metrics based on type
+  const renderComponentSpecificMetrics = (node: any, pos: { x: number; y: number }) => {
+    const metrics = node.specificMetrics || {};
+    const fontSize = 16;
+    const fontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace";
+    let yOffset = 200;
+    const metricsToShow: Array<{ label: string; value: string; color: string }> = [];
+
+    switch (node.type) {
+      case 'CACHE':
+        if (metrics.hitRate !== undefined) {
+          const hitRatePercent = Math.round(metrics.hitRate * 100);
+          metricsToShow.push({
+            label: 'Hit',
+            value: `${hitRatePercent}%`,
+            color: hitRatePercent < 50 ? '#ff3366' : hitRatePercent < 70 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        if (metrics.evictionRate !== undefined && metrics.evictionRate > 0) {
+          metricsToShow.push({
+            label: 'Evict',
+            value: `${Math.round(metrics.evictionRate)}/s`,
+            color: metrics.evictionRate > 100 ? '#ff3366' : '#ffaa00',
+          });
+        }
+        if (metrics.keysStored !== undefined) {
+          metricsToShow.push({
+            label: 'Keys',
+            value: `${Math.round(metrics.keysStored / 1000)}k`,
+            color: '#00aaff',
+          });
+        }
+        break;
+
+      case 'DB_PRIMARY':
+      case 'DB_REPLICA':
+        if (metrics.connections !== undefined && metrics.maxConnections !== undefined) {
+          const connPercent = Math.round((metrics.connections / metrics.maxConnections) * 100);
+          metricsToShow.push({
+            label: 'Conn',
+            value: `${metrics.connections}/${metrics.maxConnections}`,
+            color: connPercent > 80 ? '#ff3366' : connPercent > 60 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        if (metrics.avgQueryLatency !== undefined) {
+          metricsToShow.push({
+            label: 'Qry',
+            value: `${Math.round(metrics.avgQueryLatency)}ms`,
+            color: metrics.avgQueryLatency > 1000 ? '#ff3366' : metrics.avgQueryLatency > 500 ? '#ffaa00' : '#888',
+          });
+        }
+        break;
+
+      case 'WORKERS':
+        if (metrics.queueBacklog !== undefined && metrics.queueBacklog > 0) {
+          metricsToShow.push({
+            label: 'Queue',
+            value: `${metrics.queueBacklog}`,
+            color: metrics.queueBacklog > 100 ? '#ff3366' : metrics.queueBacklog > 50 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        if (metrics.jobsProcessedPerSec !== undefined) {
+          metricsToShow.push({
+            label: 'Jobs',
+            value: `${Math.round(metrics.jobsProcessedPerSec)}/s`,
+            color: '#00aaff',
+          });
+        }
+        if (metrics.failedJobsPercent !== undefined && metrics.failedJobsPercent > 0) {
+          metricsToShow.push({
+            label: 'Fail',
+            value: `${Math.round(metrics.failedJobsPercent * 100)}%`,
+            color: '#ff3366',
+          });
+        }
+        break;
+
+      case 'QUEUE':
+        if (metrics.messagesQueued !== undefined) {
+          const queuePercent = metrics.maxQueueDepth ? Math.round((metrics.messagesQueued / metrics.maxQueueDepth) * 100) : 0;
+          metricsToShow.push({
+            label: 'Msgs',
+            value: `${metrics.messagesQueued}`,
+            color: queuePercent > 80 ? '#ff3366' : queuePercent > 60 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        break;
+
+      case 'APP':
+        if (metrics.avgCPUPercent !== undefined) {
+          metricsToShow.push({
+            label: 'CPU',
+            value: `${Math.round(metrics.avgCPUPercent)}%`,
+            color: metrics.avgCPUPercent > 80 ? '#ff3366' : metrics.avgCPUPercent > 60 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        if (metrics.avgMemoryPercent !== undefined) {
+          metricsToShow.push({
+            label: 'Mem',
+            value: `${Math.round(metrics.avgMemoryPercent)}%`,
+            color: metrics.avgMemoryPercent > 80 ? '#ff3366' : metrics.avgMemoryPercent > 60 ? '#ffaa00' : '#00ffaa',
+          });
+        }
+        break;
+    }
+
+    if (metricsToShow.length === 0) return null;
+
+    return (
+      <g className="component-specific-metrics">
+        {metricsToShow.map((metric, idx) => (
+          <text
+            key={idx}
+            x={pos.x + 30 + (idx * 80)}
+            y={pos.y + yOffset}
+            fill={metric.color}
+            fontSize={fontSize}
+            fontFamily={fontFamily}
+            fontWeight="600"
+          >
+            {metric.label}:{metric.value}
+          </text>
+        ))}
+      </g>
+    );
   };
 
   // Handle wheel zoom
@@ -390,6 +566,46 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                 </text>
               </g>
 
+              {/* Component-specific metrics (dynamic based on type) */}
+              {renderComponentSpecificMetrics(node, pos)}
+
+              {/* Instance badge (if part of redundancy group) */}
+              {node.redundancyGroup && node.instanceNumber && (
+                <g>
+                  <circle
+                    cx={pos.x + 260}
+                    cy={pos.y + 30}
+                    r="18"
+                    fill="#00ffaa"
+                    opacity="0.9"
+                  />
+                  <text
+                    x={pos.x + 260}
+                    y={pos.y + 37}
+                    textAnchor="middle"
+                    fill="#0a0a0f"
+                    fontSize="20"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    fontWeight="bold"
+                  >
+                    #{node.instanceNumber}
+                  </text>
+                </g>
+              )}
+
+              {/* Primary indicator (star) */}
+              {node.isPrimary && (
+                <text
+                  x={pos.x + 240}
+                  y={pos.y + 35}
+                  fill="#ffaa00"
+                  fontSize="24"
+                  fontWeight="bold"
+                >
+                  ⭐
+                </text>
+              )}
+
               {/* Status text */}
               <text
                 x={pos.x + 150}
@@ -397,7 +613,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                 textAnchor="middle"
                 fill={color}
                 fontSize="22"
-                fontFamily="monospace"
+                fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
                 fontWeight="700"
               >
                 {status.toUpperCase()}

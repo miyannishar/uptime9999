@@ -22,6 +22,14 @@ export function createInitialState(seed: string): GameState {
   const architecture = createInitialArchitecture();
   const startTime = Date.now();
 
+  // Initialize component counters based on initial architecture
+  const componentCounters = new Map<string, number>();
+  architecture.nodes.forEach((node) => {
+    const baseType = node.type.toLowerCase();
+    const current = componentCounters.get(baseType) || 0;
+    componentCounters.set(baseType, current + 1);
+  });
+
   return {
     seed,
     startTime,
@@ -35,6 +43,7 @@ export function createInitialState(seed: string): GameState {
     recentIncidentTargets: [], // Track recently targeted nodes for diversity
 
     architecture,
+    componentCounters,
 
     users: GAME_CONFIG.starting.users,
     peakUsers: GAME_CONFIG.starting.users,
@@ -79,7 +88,35 @@ export function createInitialState(seed: string): GameState {
 export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1): GameState {
   if (state.paused || state.gameOver) return state;
 
-  const newState = { ...state };
+  // CRITICAL: Deep clone state to prevent mutations
+  // Maps and nested objects are NOT cloned by spread operator!
+  const newState = {
+    ...state,
+    architecture: {
+      nodes: new Map(state.architecture.nodes),
+      edges: [...state.architecture.edges],
+    },
+    componentCounters: new Map(state.componentCounters),
+    actionCooldowns: new Map(state.actionCooldowns),
+    unlockedFeatures: new Set(state.unlockedFeatures),
+    recentIncidentTargets: [...state.recentIncidentTargets],
+    activeIncidents: state.activeIncidents.map(inc => ({ ...inc })),
+    actionsInProgress: state.actionsInProgress.map(act => ({ ...act })),
+    uptimeWindow: [...state.uptimeWindow],
+  };
+  
+  // Deep clone nodes (they contain nested objects)
+  newState.architecture.nodes = new Map(
+    Array.from(state.architecture.nodes.entries()).map(([id, node]) => [
+      id,
+      {
+        ...node,
+        scaling: { ...node.scaling },
+        specificMetrics: { ...node.specificMetrics },
+        features: { ...node.features },
+      },
+    ])
+  );
   const elapsed = (Date.now() - state.startTime) / 1000;
 
   // Update time
@@ -192,11 +229,39 @@ function propagateLoad(state: GameState, ingressRPS: number) {
       const target = nodes.get(edge.to);
       if (target && target.enabled) {
         const propagatedLoad = current.loadIn * edge.weight * (1 - current.errorRate);
-        target.loadIn += propagatedLoad;
-        current.loadOut += propagatedLoad;
         
-        if (!visited.has(edge.to)) {
-          queue.push(edge.to);
+        // Check if target has redundancy group - distribute load across all instances
+        if (target.redundancyGroup) {
+          const groupInstances = Array.from(nodes.values()).filter(
+            n => n.redundancyGroup === target.redundancyGroup && n.enabled && n.health > 0.3
+          );
+          
+          if (groupInstances.length > 0) {
+            // Distribute load evenly across healthy instances in the group
+            const loadPerInstance = propagatedLoad / groupInstances.length;
+            groupInstances.forEach(instance => {
+              instance.loadIn += loadPerInstance;
+              if (!visited.has(instance.id)) {
+                queue.push(instance.id);
+              }
+            });
+            current.loadOut += propagatedLoad;
+          } else {
+            // No healthy instances - load is lost (system degraded)
+            target.loadIn += propagatedLoad;
+            current.loadOut += propagatedLoad;
+            if (!visited.has(edge.to)) {
+              queue.push(edge.to);
+            }
+          }
+        } else {
+          // No redundancy group - normal propagation
+          target.loadIn += propagatedLoad;
+          current.loadOut += propagatedLoad;
+          
+          if (!visited.has(edge.to)) {
+            queue.push(edge.to);
+          }
         }
       }
     }
@@ -453,19 +518,51 @@ function computeGlobalMetrics(state: GameState) {
 }
 
 function updateUptime(state: GameState, dt: number) {
-  // Check if system is up - check critical nodes too
+  // Check if system is up - with redundancy support
   const { nodes } = state.architecture;
   
-  // Critical nodes that must be up - use gradual health thresholds
-  const criticalNodes = ['dns', 'app', 'db_primary'];
+  // Check critical component groups (with redundancy support)
+  const criticalGroups = [
+    { group: 'dns_cluster', fallback: ['dns'] },
+    { group: 'app_cluster', fallback: ['app'] },
+    { group: 'db_replicas', fallback: ['db_primary', 'db_replica'] },
+  ];
+  
   let criticalNodesHealth = 1.0;
-  criticalNodes.forEach(id => {
-    const node = nodes.get(id);
-    if (!node || !node.enabled || node.operationalMode === 'down') {
+  
+  criticalGroups.forEach(({ group, fallback }) => {
+    // Find all instances in redundancy group
+    const groupInstances = Array.from(nodes.values()).filter(
+      n => n.redundancyGroup === group && n.enabled
+    );
+    
+    // If no redundancy group, fall back to specific nodes
+    const instancesToCheck = groupInstances.length > 0 
+      ? groupInstances 
+      : fallback.map(id => nodes.get(id)).filter(n => n && n.enabled);
+    
+    if (instancesToCheck.length === 0) {
+      // No instances at all - system is down
       criticalNodesHealth = 0;
-    } else if (node.health < 0.3) {
-      // Start degrading uptime gradually when health < 30%
-      criticalNodesHealth = Math.min(criticalNodesHealth, node.health / 0.3);
+      return;
+    }
+    
+    // Check if at least one instance is healthy
+    const healthyInstances = instancesToCheck.filter(
+      n => n && n.operationalMode !== 'down' && n.health >= 0.3
+    );
+    
+    if (healthyInstances.length === 0) {
+      // All instances down - system is down
+      criticalNodesHealth = 0;
+    } else {
+      // At least one instance is up - use best health
+      const bestHealth = Math.max(...healthyInstances.map(n => n!.health));
+      if (bestHealth < 0.7) {
+        // Degraded but operational
+        criticalNodesHealth = Math.min(criticalNodesHealth, bestHealth / 0.7);
+      }
+      // If bestHealth >= 0.7, no degradation (full redundancy working)
     }
   });
   
@@ -506,8 +603,23 @@ function updateBusiness(state: GameState, dt: number) {
 
   state.costs = infrastructureCost;
 
-  // Compute revenue
-  state.revenue = computeRevenue(state.users, state.pricing, state.reputation, state.uptime);
+  // Compute base revenue
+  let revenue = computeRevenue(state.users, state.pricing, state.reputation, state.uptime);
+  
+  // BOOST: Resolving incidents improves service quality → users pay more!
+  // If you've resolved more incidents than active, you're maintaining quality
+  if (state.resolvedIncidents > state.activeIncidents.length * 2) {
+    // Resolved 2x more than currently active = excellent maintenance
+    revenue *= 1.1; // +10% revenue boost!
+  }
+  
+  // BOOST: High resolution rate = premium service perception
+  if (state.resolvedIncidents > 10 && state.activeIncidents.length === 0) {
+    // Resolved many incidents and currently clean = premium reputation
+    revenue *= 1.15; // +15% revenue boost!
+  }
+  
+  state.revenue = revenue;
 
   // Update cash
   const cashDelta = (state.revenue - state.costs) * dt;
@@ -515,12 +627,32 @@ function updateBusiness(state: GameState, dt: number) {
   state.totalProfit += cashDelta;
 
   // User growth
-  const growthRate = computeGrowthRate(
+  let growthRate = computeGrowthRate(
     state.reputation,
     state.globalLatencyP95,
     state.globalErrorRate,
     1.0
   );
+  
+  // BOOST: Resolving incidents increases user trust → more growth!
+  // Calculate incidents resolved recently (last 60 seconds)
+  const recentResolutions = state.resolvedIncidents; // Total resolved
+  const activeIncidentCount = state.activeIncidents.length;
+  
+  // If resolving incidents faster than they appear, users trust you more!
+  if (recentResolutions > 0 && activeIncidentCount < 3) {
+    // Low active incidents + high resolution rate = trust boost
+    const resolutionRate = recentResolutions / Math.max(1, state.totalIncidents);
+    if (resolutionRate > 0.7) { // Resolved 70%+ of incidents
+      growthRate *= 1.2; // +20% growth boost!
+    }
+  }
+  
+  // BOOST: High reputation + low incidents = strong growth
+  if (state.reputation > 80 && activeIncidentCount === 0) {
+    growthRate *= 1.3; // +30% growth when reputation high and no incidents!
+  }
+  
   const churnRate = computeChurnRate(
     state.globalLatencyP95,
     state.globalErrorRate,
@@ -535,7 +667,29 @@ function updateBusiness(state: GameState, dt: number) {
   const severityScore = state.activeIncidents.reduce((sum, inc) => {
     return sum + (inc.severity === 'CRIT' ? 3 : inc.severity === 'WARN' ? 2 : 1);
   }, 0);
-  const reputationDelta = computeReputationDelta(state.uptime, state.globalErrorRate, severityScore / 10);
+  let reputationDelta = computeReputationDelta(state.uptime, state.globalErrorRate, severityScore / 10);
+  
+  // REWARD: Bonus reputation for good performance!
+  // High uptime streak gives reputation bonus
+  if (state.uptimeStreak > 300) { // 5+ minutes of good uptime
+    reputationDelta += 0.5; // Bonus reputation!
+  }
+  if (state.uptimeStreak > 600) { // 10+ minutes
+    reputationDelta += 1.0; // Even more bonus!
+  }
+  
+  // BOOST: Resolving incidents actively improves reputation
+  // If you're resolving incidents faster than they appear, reputation grows
+  if (state.resolvedIncidents > state.totalIncidents * 0.8) {
+    // Resolved 80%+ of all incidents = excellent track record
+    reputationDelta += 0.3; // Continuous reputation boost!
+  }
+  
+  // BOOST: Clean slate (no active incidents) = reputation recovery
+  if (state.activeIncidents.length === 0 && state.uptime > 0.9) {
+    reputationDelta += 0.5; // Strong reputation recovery when clean!
+  }
+  
   state.reputation = Math.max(0, Math.min(100, state.reputation + reputationDelta * dt));
 }
 
@@ -543,7 +697,11 @@ function updateBusiness(state: GameState, dt: number) {
 // All incidents are now AI-generated based on real system metrics
 
 function updateIncidents(state: GameState, _dt: number) {
+  let incidentsResolvedThisTick = 0;
+  
   state.activeIncidents = state.activeIncidents.filter(incident => {
+    let wasResolved = false;
+    
     // AI-generated incidents
     if (incident.aiGenerated) {
       const elapsed = (Date.now() - incident.startTime) / 1000;
@@ -552,18 +710,25 @@ function updateIncidents(state: GameState, _dt: number) {
       const autoResolveTime = incident.outagetimer || 300;
       if (elapsed > autoResolveTime) {
         state.resolvedIncidents++;
+        incidentsResolvedThisTick++;
+        wasResolved = true;
         console.log('🔄 AI incident auto-resolved:', (incident as any).aiIncidentName);
-        return false;
       }
 
-      // Fully mitigated
-      if (incident.mitigationLevel >= 1.0) {
+      // Fully mitigated (player resolved it!)
+      if (!wasResolved && incident.mitigationLevel >= 1.0) {
         state.resolvedIncidents++;
+        incidentsResolvedThisTick++;
+        wasResolved = true;
         console.log('✅ AI incident mitigated:', (incident as any).aiIncidentName);
-        return false;
+        
+        // REWARD: Player resolved it - give bonus!
+        import('../utils/terminalLog').then(({ tlog }) => {
+          tlog.success(`🎉 Incident resolved! Reputation +${incident.severity === 'CRIT' ? '5' : incident.severity === 'WARN' ? '3' : '1'}`);
+        });
       }
 
-      return true;
+      return !wasResolved;
     }
     
     // Regular incidents
@@ -575,17 +740,34 @@ function updateIncidents(state: GameState, _dt: number) {
     // Auto-resolve
     if (incidentDef.autoResolveSeconds && elapsed > incidentDef.autoResolveSeconds) {
       state.resolvedIncidents++;
+      incidentsResolvedThisTick++;
       return false;
     }
 
-    // Fully mitigated
+    // Fully mitigated (player resolved it!)
     if (incident.mitigationLevel >= 1.0) {
       state.resolvedIncidents++;
+      incidentsResolvedThisTick++;
       return false;
     }
 
     return true;
   });
+
+  // REWARD: Positive effects for resolving incidents!
+  if (incidentsResolvedThisTick > 0) {
+    // Reputation boost (more for critical incidents)
+    const reputationBoost = incidentsResolvedThisTick * 2; // +2 per incident
+    state.reputation = Math.min(100, state.reputation + reputationBoost);
+    
+    // User growth boost (users trust the service more)
+    // This will be applied in updateBusiness via growth multiplier
+    
+    // Log the reward
+    import('../utils/terminalLog').then(({ tlog }) => {
+      tlog.success(`✨ Resolved ${incidentsResolvedThisTick} incident(s)! Reputation +${reputationBoost}`);
+    });
+  }
 }
 
 function updateActions(state: GameState, _dt: number) {

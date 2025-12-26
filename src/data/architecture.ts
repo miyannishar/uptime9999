@@ -56,6 +56,9 @@ export function createInitialArchitecture(): {
     operationalMode: 'normal',
     specificMetrics: dnsMetrics,
     features: {},
+    redundancyGroup: 'dns_cluster',
+    isPrimary: true,
+    instanceNumber: 1,
   });
 
   // CDN
@@ -281,6 +284,9 @@ export function createInitialArchitecture(): {
     costPerSec: 0.3,
     operationalMode: 'normal',
     specificMetrics: appMetrics,
+    redundancyGroup: 'app_cluster',
+    isPrimary: true,
+    instanceNumber: 1,
     features: {
       autoscaling: false,
       circuitBreaker: false,
@@ -438,6 +444,9 @@ export function createInitialArchitecture(): {
     costPerSec: 0.25,
     operationalMode: 'normal',
     specificMetrics: workersMetrics,
+    redundancyGroup: 'worker_pool',
+    isPrimary: true,
+    instanceNumber: 1,
     features: {},
   });
 
@@ -479,6 +488,9 @@ export function createInitialArchitecture(): {
     costPerSec: 0.5,
     operationalMode: 'normal',
     specificMetrics: dbPrimaryMetrics,
+    redundancyGroup: 'db_replicas',
+    isPrimary: true,
+    instanceNumber: 1,
     features: {
       connectionPool: false,
       maxConnections: 100,
@@ -523,6 +535,9 @@ export function createInitialArchitecture(): {
     costPerSec: 0.4,
     operationalMode: 'normal',
     specificMetrics: dbReplicaMetrics,
+    redundancyGroup: 'db_replicas',
+    isPrimary: false,
+    instanceNumber: 1,
     features: {},
   });
 

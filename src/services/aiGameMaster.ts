@@ -237,10 +237,20 @@ Analyze the effectiveness of this action and respond with a JSON object containi
   private buildSystemPrompt(_initialState: GameState): string {
     return `AI Game Master for "UPTIME 99.99" - DevOps simulation.
 
-Goal: Generate creative, specific incidents based on component metrics.
+Goal: Generate creative, specific incidents based on component metrics and dynamic architecture.
 
-Components: app, cache, workers, db_primary, queue, cdn, waf, dns
-Metrics examples: hitRate, queueBacklog, connections, cpu, instances
+DYNAMIC ARCHITECTURE AWARENESS:
+- System now has MULTIPLE INSTANCES of components (app, app_2, workers, worker_2, db_replica, db_replica_2, etc.)
+- Components are grouped by redundancyGroup (e.g., 'app_cluster', 'worker_pool', 'db_replicas')
+- Player can ADD/REMOVE instances dynamically via Quick Actions
+- Incidents should target SPECIFIC INSTANCES when relevant (e.g., "worker_2 is overloaded" not just "workers")
+- If a redundancy group has multiple healthy instances, system can survive one instance failure
+- Consider instance count when generating incidents (more instances = more resilient but more complex)
+
+Components: app, cache, workers, db_primary, db_replica, queue, cdn, waf, dns, apigw, glb, rlb, storage, service_mesh, observability
++ Dynamic instances: app_2, worker_2, db_replica_2, cache_2, etc.
++ Split services: auth, payment, notification, search (if player created them)
+Metrics examples: hitRate, queueBacklog, connections, cpu, instances, instanceNumber, redundancyGroup
 
 Requirements:
 1. Specific names (not "High Latency") - e.g., "Cache Thrashing - Hit Rate 45%"
@@ -372,7 +382,7 @@ Be creative, realistic, and fair. Make the game challenging but fun!`;
     // Identify bottlenecks for AI context
     const bottlenecks = Array.from(state.architecture.nodes.values())
       .filter(n => n.enabled && (n.utilization > 0.8 || n.errorRate > 0.1 || n.health < 0.5))
-      .map(n => `${n.name} (util:${Math.round(n.utilization * 100)}%, err:${Math.round(n.errorRate * 100)}%, health:${Math.round(n.health * 100)}%, scaling:×${n.scaling.current})`)
+      .map(n => `${n.name} (${n.id}) - util:${Math.round(n.utilization * 100)}%, err:${Math.round(n.errorRate * 100)}%, health:${Math.round(n.health * 100)}%, scaling:×${n.scaling.current}`)
       .join(', ');
 
     // Track recently targeted nodes (last 60 seconds)
@@ -384,11 +394,34 @@ Be creative, realistic, and fair. Make the game challenging but fun!`;
     // Get nodes that were recently strengthened (scaled up)
     const strengthenedNodes = Array.from(state.architecture.nodes.values())
       .filter(n => n.enabled && n.scaling.current > 1)
-      .map(n => `${n.name} (×${n.scaling.current} - strengthened)`)
+      .map(n => `${n.name} (${n.id}) - ×${n.scaling.current} strengthened`)
+      .join(', ');
+
+    // Get redundancy group info
+    const redundancyInfo = new Map<string, number>();
+    state.architecture.nodes.forEach(n => {
+      if (n.enabled && n.redundancyGroup) {
+        const count = redundancyInfo.get(n.redundancyGroup) || 0;
+        redundancyInfo.set(n.redundancyGroup, count + 1);
+      }
+    });
+    
+    const redundancyStatus = Array.from(redundancyInfo.entries())
+      .map(([group, count]) => `${group}: ${count} instances`)
+      .join(', ');
+
+    // List all active nodes (including dynamic instances)
+    const allNodes = Array.from(state.architecture.nodes.values())
+      .filter(n => n.enabled)
+      .map(n => `${n.id} (${n.type}${n.redundancyGroup ? `, group:${n.redundancyGroup}` : ''})`)
       .join(', ');
 
     const prompt = `Generate a new incident. Current system state:
 ${this.serializeGameState(state)}
+
+ARCHITECTURE OVERVIEW:
+Active nodes: ${allNodes}
+Redundancy status: ${redundancyStatus || 'No redundancy groups'}
 
 BOTTLENECK ANALYSIS:
 ${bottlenecks ? `⚠️ Potential bottlenecks: ${bottlenecks}` : '✅ System healthy'}
@@ -404,6 +437,12 @@ ${recentTargets.length > 0 ? `❌ ${recentTargets.join(', ')} - targeted recentl
 
 STRENGTHENED NODES (LOW PRIORITY):
 ${strengthenedNodes || 'None scaled yet'}
+
+DYNAMIC ARCHITECTURE CONTEXT:
+- Active nodes: ${allNodes}
+- Redundancy: ${redundancyStatus || 'No redundancy'}
+- Target SPECIFIC INSTANCES (e.g., "worker_2") when multiple exist
+- Consider redundancy: Multiple instances = more resilient
 
 ⚡ **REQUIRED SEVERITY: ${requiredSeverity}** ⚡
 You MUST generate an incident with severity="${requiredSeverity}". DO NOT CHANGE THIS!

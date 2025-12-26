@@ -48,6 +48,11 @@ export interface ComponentNode {
   // State
   operationalMode: 'normal' | 'degraded' | 'down';
   
+  // Dynamic architecture support
+  redundancyGroup?: string; // e.g., 'app_cluster', 'db_replicas', 'worker_pool'
+  isPrimary?: boolean; // For primary/replica patterns (DB, cache, etc.)
+  instanceNumber?: number; // Instance number (1, 2, 3, etc.) for same type
+  
   // Component-specific metrics (detailed metrics for each component type)
   specificMetrics: Record<string, any>; // Will be typed based on component type
   
@@ -119,6 +124,25 @@ export interface ActionDefinition {
       delta: number;
     };
     downtimeRisk?: number; // 0-1 chance of causing outage
+    addComponent?: {
+      type: ComponentType;
+      baseNodeId: string; // Template to copy from (e.g., 'app', 'worker', 'db_replica')
+      redundancyGroup?: string;
+      isPrimary?: boolean;
+      connections?: Array<{
+        from: string; // 'source' = the new node, any other string = existing node
+        to: string;   // 'target' = the new node, any other string = existing node
+        weight: number;
+      }>;
+    };
+    removeComponent?: {
+      nodeId: string; // Specific node to remove
+    };
+    splitService?: {
+      serviceName: string; // 'auth', 'payment', etc.
+      type: ComponentType;
+      trafficPercentage: number; // % of app traffic to redirect
+    };
   };
 }
 
@@ -215,6 +239,7 @@ export interface GameState {
   
   // Architecture
   architecture: Architecture;
+  componentCounters: Map<string, number>; // Track instance count per component type (e.g., 'app' -> 2 means app and app_2 exist)
   
   // Business
   users: number;

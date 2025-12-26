@@ -113,9 +113,10 @@ function App() {
     let lastTick = Date.now();
 
     const interval = setInterval(async () => {
-      const currentState = stateRef.current;
+      // ALWAYS use stateRef.current to get the absolute latest state (includes user actions)
+      const latestState = stateRef.current;
       
-      if (currentState.paused || currentState.gameOver || !currentState.aiSessionActive) return;
+      if (latestState.paused || latestState.gameOver || !latestState.aiSessionActive) return;
 
       const now = Date.now();
       const realDt = (now - lastTick) / 1000;
@@ -123,8 +124,11 @@ function App() {
 
       const dt = realDt; // Removed speed multiplier - always runs at real-time
 
-      // Tick simulation - this creates a new state based on the LATEST state
-      const newState = tickSimulation(currentState, rngRef.current, dt);
+      // Tick simulation on the LATEST state (includes any user action changes)
+      const newState = tickSimulation(latestState, rngRef.current, dt);
+      
+      // Update state FIRST (before async AI operations)
+      dispatch({ type: 'LOAD_GAME', state: newState });
       
       // AI Game Master: Generate contextual incidents based on system metrics
       if (newState.aiSessionActive) {
@@ -206,9 +210,6 @@ function App() {
           }
         }
       }
-      
-      // Update state through dispatch
-      dispatch({ type: 'LOAD_GAME', state: newState });
     }, 100); // 100ms tick
 
     return () => clearInterval(interval);

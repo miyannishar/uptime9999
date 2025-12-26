@@ -7,20 +7,62 @@ interface ActionBarProps {
 }
 
 export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
-  // Quick actions - most commonly needed
+  // Quick actions - Mix of scaling AND cost-saving!
   const quickActionIds = [
-    'scale_app_1',
-    'scale_app_2',
-    'scale_down_app_1', // Cost reduction
-    'enable_rate_limit_waf',
-    'rollback_deploy',
-    'add_workers_2',
-    'scale_down_workers_2', // Cost reduction
-    'increase_db_connections',
-    'scale_cache',
-    'disable_cache', // Cost reduction
-    'enable_circuit_breaker',
-    'reduce_observability', // Cost reduction
+    // === COST SAVING (Show first - positive actions!) ===
+    'scale_down_app',
+    'scale_down_workers',
+    'optimize_db_queries',
+    'optimize_cache_ttl',
+    'compress_assets',
+    'consolidate_instances',
+    'price_increase',
+    'code_cleanup',
+    
+    // === SCALING (Add capacity) ===
+    'add_app_instance',
+    'remove_app_instance',
+    'add_worker_instance',
+    'remove_worker_instance',
+    
+    // === DATABASE ===
+    'add_db_replica',
+    'add_db_pooler',
+    'enable_multi_az',
+    
+    // === MICROSERVICES ===
+    'split_auth_service',
+    'split_payment_service',
+    'split_notification_service',
+    
+    // === CACHING & PERFORMANCE ===
+    'add_cache_node',
+    'add_cdn_edge',
+    'remove_cache_emergency',
+    
+    // === INFRASTRUCTURE ===
+    'add_apigw_instance',
+    'add_message_bus',
+    'add_search_service',
+    'add_reverse_proxy',
+    
+    // === OBSERVABILITY ===
+    'add_distributed_tracing',
+    'add_log_aggregation',
+    
+    // === COST OPTIMIZATION ===
+    'enable_autoscaling',
+    'compress_static_assets',
+    
+    // === SECURITY ===
+    'add_ddos_protection',
+    'add_rate_limiting',
+    'enable_e2e_encryption',
+    
+    // === ADVANCED ===
+    'add_priority_queue',
+    'add_dead_letter_queue',
+    'enable_anycast_dns',
   ];
 
   const canExecuteAction = (actionId: string): boolean => {

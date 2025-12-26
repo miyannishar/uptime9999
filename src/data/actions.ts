@@ -1,8 +1,17 @@
 // Action definitions (40+ actions)
 
 import { ActionDefinition } from '../sim/types';
+import { DYNAMIC_ACTIONS } from './dynamicActions';
+import { COST_SAVING_ACTIONS } from './costSavingActions';
 
 export const ACTIONS: ActionDefinition[] = [
+  // === COST SAVING & OPTIMIZATION ACTIONS ===
+  ...COST_SAVING_ACTIONS,
+  
+  // === DYNAMIC ARCHITECTURE OPERATIONS (20 operations) ===
+  ...DYNAMIC_ACTIONS,
+  
+  // === ORIGINAL ACTIONS (40+ actions) ===
   // === COMPUTE & SCALING ===
   {
     id: 'scale_app_1',
