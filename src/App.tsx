@@ -87,7 +87,8 @@ function App() {
   useEffect(() => {
     if (!state.aiSessionActive) {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      console.log('🔍 Checking API key...', apiKey ? 'Found (length: ' + apiKey.length + ')' : 'Not found');
+      // Security: Only log presence, never the actual key or length
+      console.log('🔍 Checking API key...', apiKey ? 'Found' : 'Not found');
       
       if (apiKey && apiKey.startsWith('sk-')) {
         console.log('🤖 Initializing AI Game Master...');
@@ -101,7 +102,8 @@ function App() {
         });
       } else {
         console.error('❌ API key missing or invalid');
-        alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\nCurrent value: ${apiKey || 'undefined'}`);
+        // Security: Never show the actual API key value in alerts
+        alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\n⚠️ SECURITY WARNING: This is a client-side app. API keys are bundled into the JavaScript.\nFor production, use a backend proxy to protect your API key.`);
       }
     }
   }, [state.aiSessionActive]);
