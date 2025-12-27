@@ -36,7 +36,6 @@ export default function TaskModal({
   
   // Track if we've already generated a task for this combination
   const generatedTaskRef = useRef<string>('');
-  const isMountedRef = useRef(true);
   const isGeneratingRef = useRef(false);
 
   useEffect(() => {
@@ -57,7 +56,6 @@ export default function TaskModal({
     // Mark this task as being generated
     generatedTaskRef.current = taskKey;
     isGeneratingRef.current = true;
-    isMountedRef.current = true;
     
     // Reset state
     setTaskData(null);
@@ -80,8 +78,8 @@ export default function TaskModal({
       targetNode,
       apiKey
     ).then((task) => {
-      // Only update state if component is still mounted and this is still the current request
-      if (!isMountedRef.current || generatedTaskRef.current !== taskKey) {
+      // Only check if this is still the current request
+      if (generatedTaskRef.current !== taskKey) {
         return;
       }
 
@@ -92,21 +90,22 @@ export default function TaskModal({
       }
       setIsLoading(false);
       isGeneratingRef.current = false;
-    }).catch(() => {
-      // Only update state if component is still mounted and this is still the current request
-      if (!isMountedRef.current || generatedTaskRef.current !== taskKey) {
+    }).catch((err) => {
+      // Only check if this is still the current request
+      if (generatedTaskRef.current !== taskKey) {
         return;
       }
       
-      setError('Failed to generate task');
+      setError(`Failed to generate task: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsLoading(false);
       isGeneratingRef.current = false;
     });
 
-    // Cleanup function
+    // Cleanup function - only mark as unmounted on actual unmount
     return () => {
-      isMountedRef.current = false;
-      // Note: We can't cancel the fetch request, but we prevent state updates
+      // Don't set isMountedRef to false here - it causes race conditions
+      // Instead, we only check if the taskKey matches
+      isGeneratingRef.current = false;
     };
   }, [incidentName, incidentDescription, actionName, actionDescription, targetNode]);
 

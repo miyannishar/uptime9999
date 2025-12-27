@@ -152,6 +152,13 @@ class AIGameMaster {
       });
     }
     
+    // Limit conversation history aggressively - only keep system message and current request
+    // This prevents token accumulation from growing conversation history
+    // Context is provided via the prompt itself (recent incidents summary, current state)
+    this.conversationHistory = [
+      this.conversationHistory[0], // Keep only system message
+    ];
+
     this.conversationHistory.push({
       role: 'user',
       content: prompt,
@@ -213,6 +220,11 @@ Analyze the effectiveness of this action and respond with a JSON object containi
   "reputationDelta": number,
   "nextIncidentHint": "brief hint about what might happen next"
 }`;
+
+    // Reset conversation history - only keep system message
+    this.conversationHistory = [
+      this.conversationHistory[0], // Keep only system message
+    ];
 
     this.conversationHistory.push({
       role: 'user',
@@ -389,12 +401,6 @@ Be creative, realistic, and fair. Make the game challenging but fun!`;
       .filter(t => now - t.timestamp < 60000)
       .map(t => t.nodeId);
     
-    // Get nodes that were recently strengthened (scaled up)
-    const strengthenedNodes = Array.from(state.architecture.nodes.values())
-      .filter(n => n.enabled && n.scaling.current > 1)
-      .map(n => `${n.name} (${n.id}) - ×${n.scaling.current} strengthened`)
-      .join(', ');
-
     // Get redundancy group info
     const redundancyInfo = new Map<string, number>();
     state.architecture.nodes.forEach(n => {
@@ -414,136 +420,55 @@ Be creative, realistic, and fair. Make the game challenging but fun!`;
       .map(n => `${n.id} (${n.type}${n.redundancyGroup ? `, group:${n.redundancyGroup}` : ''})`)
       .join(', ');
 
-    const prompt = `Generate a new incident. Current system state:
-${this.serializeGameState(state)}
+    const prompt = `Generate incident. State: ${this.serializeGameState(state)}
 
-ARCHITECTURE OVERVIEW:
-Active nodes: ${allNodes}
-Redundancy status: ${redundancyStatus || 'No redundancy groups'}
-
-BOTTLENECK ANALYSIS:
-${bottlenecks ? `⚠️ Potential bottlenecks: ${bottlenecks}` : '✅ System healthy'}
-
-ACTIVE INCIDENTS (Avoid duplicates):
-${state.activeIncidents.length > 0 
-  ? state.activeIncidents.map(i => `- ${i.targetNodeId}: ${i.aiGenerated ? (i as any).aiIncidentName : 'incident'} (${i.severity})`).join('\n')
-  : 'None - system is clean'
+Nodes: ${allNodes}
+Redundancy: ${redundancyStatus || 'None'}
+Bottlenecks: ${bottlenecks || 'None'}
+Active: ${state.activeIncidents.length > 0 
+  ? state.activeIncidents.map(i => `${i.targetNodeId}:${i.severity}`).join(',')
+  : 'None'
 }
+Avoid: ${recentTargets.join(',') || 'None'}
 
-RECENTLY TARGETED NODES (AVOID):
-${recentTargets.length > 0 ? `❌ ${recentTargets.join(', ')} - targeted recently, try different nodes` : 'None'}
+⚡ REQUIRED: severity="${requiredSeverity}" ⚡
+${requiredSeverity === 'CRIT' ? 'Serious threat (pool exhausted, OOM, queue 95%)' : requiredSeverity === 'WARN' ? 'Moderate problem (DB 80/100, hit rate 60%)' : 'Minor issue or optimization opportunity'}
 
-STRENGTHENED NODES (LOW PRIORITY):
-${strengthenedNodes || 'None scaled yet'}
+Rules:
+1. Be SPECIFIC: "Memory Leak - 6GB Leaked" not "High Latency"
+2. Match metrics: queue>100→Workers, conn>80→DB, hitRate<60→Cache, cpu>80→APP
+3. Creative: leaks, exhaustion, thrashing, zombies, deadlocks
+4. Target NOT in: ${recentTargets.join(',') || 'none'}
+5. Actions: Specific fixes (e.g., "Scale workers 2→5", "Increase pool 100→200")
 
-DYNAMIC ARCHITECTURE CONTEXT:
-- Active nodes: ${allNodes}
-- Redundancy: ${redundancyStatus || 'No redundancy'}
-- Target SPECIFIC INSTANCES (e.g., "worker_2") when multiple exist
-- Consider redundancy: Multiple instances = more resilient
-
-⚡ **REQUIRED SEVERITY: ${requiredSeverity}** ⚡
-You MUST generate an incident with severity="${requiredSeverity}". DO NOT CHANGE THIS!
-${requiredSeverity === 'CRIT'
-  ? 'This should be a SERIOUS threat requiring immediate action (e.g., connection pool exhausted, OOM, critical queue backlog, system outage risk).'
-  : requiredSeverity === 'WARN'
-  ? 'This should be a moderate problem requiring attention (e.g., DB connections 80/100, cache hit rate 60%, high utilization).'
-  : 'This should be a minor issue OR a profit optimization opportunity (category "OPTIMIZATION"). No significant negative effects.'
-}
-
-CRITICAL RULES - FOLLOW STRICTLY:
-
-1. **BE SPECIFIC AND CREATIVE - NO GENERIC "HIGH LATENCY" / "HIGH ERROR" INCIDENTS!**
-   ❌ BAD: "High Latency Detected in App Cluster"
-   ✅ GOOD: "Memory Leak in App Servers - 6GB Leaked in 10 Minutes"
-   ✅ GOOD: "Database Connection Pool Exhausted - 98/100 Connections Active"
-   ✅ GOOD: "Cache Thrashing - Hit Rate Plummeted to 35%"
-   ✅ GOOD: "Zombie Worker Processes - 15 Stuck Jobs Blocking Queue"
-   ✅ GOOD: "CDN Origin Shield Misconfiguration - Bypassing 70% of Cache"
-   ✅ GOOD: "Rate Limiter False Positives - Blocking 25% of Legitimate Traffic"
-
-2. **VARY SEVERITY BASED ON ACTUAL METRICS** (not periodic WARN):
-   - **INFO** (50%): 
-     * 30% - Minor issues on healthy nodes (cache hit rate 75% → 70%)
-     * 20% - PROFIT OPTIMIZATION OPPORTUNITIES (no negative effects, suggest improvements that increase profit/min)
-   - **WARN** (30%): Moderate problems needing attention (DB connections 80/100)
-   - **CRIT** (20%): SERIOUS threats requiring immediate action (connection pool exhausted, OOM, queue depth 95%)
-   - Check nodeMetrics: If health < 0.5 or utilization > 0.9 or specific metrics critical → CRIT!
-
-3. **TARGET WEAK NODES INTELLIGENTLY**:
-   - If queueBacklog over 100 then Workers incident
-   - If connections over 80 percent of max then DB connection incident
-   - If hitRate under 0.6 then Cache performance incident
-   - If avgCPUPercent over 80 then APP resource exhaustion incident
-   - If node is strengthened with 3+ instances then AVOID or make it external or random
-
-4. **CREATIVE INCIDENT TYPES** (not just latency/errors):
-   - Memory leaks, connection leaks, resource exhaustion
-   - Cascading failures, thundering herd, retry storms
-   - Configuration drift, certificate expiration, DNS issues
-   - Third-party API degradation, DDoS attacks, bot traffic
-   - Slow queries, lock contention, deadlocks
-   - Cache stampede, queue flooding, worker starvation
-   - **PROFIT OPTIMIZATION OPPORTUNITIES** (INFO severity, no negative effects):
-     * Underutilized resources (can scale down to save costs)
-     * Cache efficiency improvements (better hit rate = less DB load = lower costs)
-     * Query optimization opportunities (faster queries = lower compute costs)
-     * Auto-scaling recommendations (scale down idle services)
-     * Cost optimization suggestions (remove unused features, optimize infrastructure)
-
-5. **ACTIONABLE SOLUTIONS** - Reference ACTUAL metrics:
-   ❌ NO: "Monitor system performance" 
-   ✅ YES: "Increase connection pool from 100 to 200 connections"
-   ✅ YES: "Scale workers from 2 to 5 instances (+150% capacity)"
-   ✅ YES: "Flush cache and increase size from 8GB to 16GB"
-   ✅ YES: "Kill stuck worker processes (15 zombies detected)"
-   ✅ YES: "Add database indexes for slow queries (reduce 25% → 5%)"
-
-6. **DIVERSIFY**: Recently targeted: ${recentTargets.join(', ') || 'none'} - CHOOSE DIFFERENT NODE!
-
-YOUR TASK:
-Generate ONE SPECIFIC, CREATIVE incident with severity="${requiredSeverity}":
-- **MANDATORY**: Use severity="${requiredSeverity}" (DO NOT CHANGE THIS!)
-- ❌ NO GENERIC "High Latency" / "High Error Rate" incidents!
-- ✅ BE CREATIVE: Memory leaks, connection exhaustion, cache thrashing, zombie processes, etc.
-${requiredSeverity === 'INFO' ? '- ✅ For INFO: Minor issues OR profit optimization opportunities (category "OPTIMIZATION" with NO negative effects)' : ''}
-- Target node NOT in: ${recentTargets.join(', ') || 'none'}
-- Check nodeMetrics for ACTUAL problems (queue backlog, connection pool, hit rate, CPU%) OR opportunities (low utilization = can save costs)
-- Include 2-4 SPECIFIC actions that directly improve metrics (no "monitor" or "review")
-- For INFO/OPTIMIZATION opportunities: Use category "OPTIMIZATION", NO negative metricEffects, suggest actions that save costs or improve efficiency
-
-EXAMPLES OF GOOD INCIDENTS:
-- Redis Memory Leak - 12GB Used with 95% Fragmentation
-- PostgreSQL Deadlock Storm - 45 Queries Blocked
-- Worker Zombie Apocalypse - 23 Stuck Processes
-- CDN Cache Poisoning - 60% Stale Content Served
-- API Gateway Circuit Breaker Triggered - 500 Requests Failing
-
-EXAMPLES OF PROFIT OPTIMIZATION OPPORTUNITIES (INFO, category "OPTIMIZATION", NO negative effects):
-- Underutilized Cache - Can Optimize TTL to Improve Hit Rate (Save DB Costs)
-- Worker Pool Over-Provisioned - Scale Down Idle Workers to Reduce Costs
-- Database Query Optimization Opportunity - Index Missing Columns (Reduce Compute Costs)
-- CDN Cache Hit Rate Low - Optimize Cache Headers to Reduce Origin Costs
-
-Respond ONLY with JSON, no markdown formatting.`;
+Respond JSON only.`;
     
     return prompt;
   }
 
   private serializeGameState(state: GameState): string {
-    // Send COMPLETE current system state but in compact format
+    // Send COMPLETE current system state for realistic incident generation
     const allNodes = Array.from(state.architecture.nodes.entries())
       .filter(([_, node]) => node.enabled)
       .map(([id, node]) => {
         const sm = node.specificMetrics;
-        const metrics: any = { id, scaling: node.scaling.current, util: Math.round(node.utilization * 100), health: Math.round(node.health * 100) };
+        const metrics: any = { 
+          id, 
+          type: node.type,
+          scaling: node.scaling.current, 
+          util: Math.round(node.utilization * 100), 
+          health: Math.round(node.health * 100),
+          err: Math.round(node.errorRate * 1000) / 10
+        };
         
-        // Add all specific metrics in compact form
-        for (const [key, value] of Object.entries(sm)) {
-          if (typeof value === 'number') {
-            metrics[key] = Math.round(value * 100) / 100;
-          } else if (typeof value === 'boolean') {
-            metrics[key] = value;
+        // Add all specific metrics (needed for realistic incident generation)
+        if (sm) {
+          for (const [key, value] of Object.entries(sm)) {
+            if (typeof value === 'number') {
+              metrics[key] = Math.round(value * 100) / 100;
+            } else if (typeof value === 'boolean') {
+              metrics[key] = value;
+            }
           }
         }
         
@@ -579,13 +504,15 @@ Respond ONLY with JSON, no markdown formatting.`;
       }),
     });
 
+    const responseData = await response.json().catch(async (err) => {
+      throw err;
+    });
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(responseData)}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    return responseData.choices[0].message.content;
   }
 
   private parseIncidentResponse(response: string): AIIncidentResponse | null {
