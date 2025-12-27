@@ -12,7 +12,6 @@ export function saveGame(state: GameState, isAutosave: boolean = false): boolean
     localStorage.setItem(key, JSON.stringify(serialized));
     return true;
   } catch (error) {
-    console.error('Failed to save game:', error);
     return false;
   }
 }
@@ -26,7 +25,6 @@ export function loadGame(isAutosave: boolean = false): GameState | null {
     const parsed = JSON.parse(saved);
     return deserializeGameState(parsed);
   } catch (error) {
-    console.error('Failed to load game:', error);
     return null;
   }
 }

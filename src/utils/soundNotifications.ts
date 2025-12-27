@@ -19,7 +19,6 @@ class SoundNotificationService {
       try {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       } catch (e) {
-        console.warn('Web Audio API not supported');
         this.enabled = false;
         return null;
       }

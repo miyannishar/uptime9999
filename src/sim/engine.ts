@@ -712,7 +712,6 @@ function updateIncidents(state: GameState, _dt: number) {
         state.resolvedIncidents++;
         incidentsResolvedThisTick++;
         wasResolved = true;
-        console.log('🔄 AI incident auto-resolved:', (incident as any).aiIncidentName);
       }
 
       // Fully mitigated (player resolved it!)
@@ -720,7 +719,6 @@ function updateIncidents(state: GameState, _dt: number) {
         state.resolvedIncidents++;
         incidentsResolvedThisTick++;
         wasResolved = true;
-        console.log('✅ AI incident mitigated:', (incident as any).aiIncidentName);
         
         // REWARD: Player resolved it - give bonus!
         import('../utils/terminalLog').then(({ tlog }) => {

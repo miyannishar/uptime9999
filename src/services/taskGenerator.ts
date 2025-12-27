@@ -288,7 +288,6 @@ Generate ONE appropriate interactive task. Respond with JSON only.`;
     });
 
     if (!response.ok) {
-      console.error('Failed to generate task:', response.status);
       return null;
     }
 
@@ -317,21 +316,17 @@ Generate ONE appropriate interactive task. Respond with JSON only.`;
         content.includes(`_${targetKey} ${currentValue}`);
       
       if (!hasCurrentValue) {
-        console.warn(`⚠️ AI generated inconsistent config task. currentValue="${currentValue}" not found in content.`);
-        console.warn('Rejecting this task...');
         return null; // Reject inconsistent tasks
       }
       
       // Also check that target value is different from current
       if (currentValue === targetValue) {
-        console.warn(`⚠️ AI generated task with currentValue === targetValue (${currentValue})`);
         return null;
       }
     }
     
     return taskData;
   } catch (error) {
-    console.error('Error generating task:', error);
     return null;
   }
 }

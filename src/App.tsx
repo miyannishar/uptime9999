@@ -87,21 +87,15 @@ function App() {
   useEffect(() => {
     if (!state.aiSessionActive) {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      // Security: Only log presence, never the actual key or length
-      console.log('🔍 Checking API key...', apiKey ? 'Found' : 'Not found');
       
       if (apiKey && apiKey.startsWith('sk-')) {
-        console.log('🤖 Initializing AI Game Master...');
         const gameMaster = initializeAIGameMaster(apiKey);
         gameMaster.startSession(state).then(() => {
           dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: true });
-          console.log('✅ AI Game Master initialized successfully!');
         }).catch(err => {
-          console.error('❌ Failed to start AI session:', err);
           alert(`Failed to initialize AI Game Master: ${err.message}\n\nThe game requires OpenAI API key to run.\n\nSteps:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\nCheck also:\n- API key is valid\n- You have OpenAI API credits\n- Network connection works`);
         });
       } else {
-        console.error('❌ API key missing or invalid');
         // Security: Never show the actual API key value in alerts
         alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\n⚠️ SECURITY WARNING: This is a client-side app. API keys are bundled into the JavaScript.\nFor production, use a backend proxy to protect your API key.`);
       }
@@ -112,21 +106,18 @@ function App() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && stateRef.current.aiSessionActive) {
-        console.log('⏸️ Tab hidden - pausing AI session');
         dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
       }
     };
 
     const handleBeforeUnload = () => {
       if (stateRef.current.aiSessionActive) {
-        console.log('🛑 Tab closing - stopping AI session');
         dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
       }
     };
 
     const handlePageHide = () => {
       if (stateRef.current.aiSessionActive) {
-        console.log('🛑 Page hiding - stopping AI session');
         dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
       }
     };
@@ -200,13 +191,6 @@ function App() {
         // Silent - only log when spawning
         
         if (timeSinceLastAI > nextIncidentTime) {
-          console.log('⏰ Spawning AI incident...');
-          console.log('📊 State:', {
-            users: Math.floor(newState.users),
-            uptime: (newState.uptime * 100).toFixed(1) + '%',
-            activeIncidents: newState.activeIncidents.length,
-          });
-          
           aiLastIncidentRef.current = now; // Reset timer IMMEDIATELY to prevent spam
           
           const gameMaster = getAIGameMaster();
@@ -252,8 +236,8 @@ function App() {
           } else {
             tlog.warn('⚠️ AI returned null - no incident generated');
           }
-            }).catch(error => {
-              console.error('❌ AI failed:', error.message);
+            }).catch(() => {
+              // Error handled silently
             });
           }
         }
@@ -272,7 +256,6 @@ function App() {
   // Stop AI session when game is over
   useEffect(() => {
     if (state.gameOver && state.aiSessionActive) {
-      console.log('🛑 Game over - stopping AI session');
       dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
     }
   }, [state.gameOver, state.aiSessionActive]);

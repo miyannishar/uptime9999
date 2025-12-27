@@ -85,7 +85,6 @@ export default function IncidentFeed({
                   selectedIncidentId === incident.id ? 'selected' : ''
                 } ${incident.aiGenerated ? 'ai-incident' : ''}`}
                 onClick={() => {
-                  console.log('🔍 Selected incident:', incident.id, incident.aiGenerated ? '(AI)' : '(Regular)');
                   onSelectIncident(incident.id);
                 }}
               >

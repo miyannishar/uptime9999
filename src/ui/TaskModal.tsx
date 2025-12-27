@@ -45,14 +45,12 @@ export default function TaskModal({
     
     // If we've already generated a task for this exact combination, don't generate again
     if (generatedTaskRef.current === taskKey && taskData) {
-      console.log('[TaskModal] ⏭️ Skipping duplicate task generation for:', taskKey);
       setIsLoading(false);
       return;
     }
 
     // Prevent concurrent generation requests
     if (isGeneratingRef.current) {
-      console.log('[TaskModal] ⚠️ Task generation already in progress, skipping');
       return;
     }
 
@@ -60,8 +58,6 @@ export default function TaskModal({
     generatedTaskRef.current = taskKey;
     isGeneratingRef.current = true;
     isMountedRef.current = true;
-    
-    console.log('[TaskModal] 🚀 Generating task for:', taskKey);
     
     // Reset state
     setTaskData(null);
@@ -86,28 +82,23 @@ export default function TaskModal({
     ).then((task) => {
       // Only update state if component is still mounted and this is still the current request
       if (!isMountedRef.current || generatedTaskRef.current !== taskKey) {
-        console.log('[TaskModal] ⏭️ Ignoring stale task result');
         return;
       }
 
       if (task) {
-        console.log('[TaskModal] ✅ Task generated successfully:', task.type);
         setTaskData(task);
       } else {
-        console.warn('[TaskModal] ❌ Failed to generate task - AI returned null');
         setError('Failed to generate task');
       }
       setIsLoading(false);
       isGeneratingRef.current = false;
-    }).catch((err) => {
+    }).catch(() => {
       // Only update state if component is still mounted and this is still the current request
       if (!isMountedRef.current || generatedTaskRef.current !== taskKey) {
-        console.log('[TaskModal] ⏭️ Ignoring stale error');
         return;
       }
       
-      console.error('[TaskModal] ❌ Error generating task:', err);
-      setError(err.message);
+      setError('Failed to generate task');
       setIsLoading(false);
       isGeneratingRef.current = false;
     });

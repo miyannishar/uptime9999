@@ -51,7 +51,6 @@ class MusicPlayer {
 
     // Handle errors gracefully
     this.audio.addEventListener('error', () => {
-      console.warn('Music file not found or failed to load:', this.audio?.src);
       // Try next track on error
       this.nextTrack();
     });
@@ -75,8 +74,8 @@ class MusicPlayer {
     }
     
     if (this.audio) {
-      this.audio.play().catch(err => {
-        console.log('Audio play failed:', err);
+      this.audio.play().catch(() => {
+        // Audio play failed - ignore silently
       });
       this.isPlaying = true;
     }

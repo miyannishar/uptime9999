@@ -579,7 +579,6 @@ function executeAction(
               relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
             }
           });
-          console.log(`🔗 Applied FULL mitigation to ${incident.relatedIncidentIds.length} related incident(s)`);
         }
       }
     }
@@ -615,7 +614,6 @@ function executeAction(
             relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
           }
         });
-        console.log(`🔗 Applied FULL mitigation to ${incident.relatedIncidentIds.length} related incident(s)`);
       }
     }
   }
@@ -665,7 +663,6 @@ function executeAIAction(
             relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
           }
         });
-        console.log(`🔗 Applied FULL mitigation to ${incident.relatedIncidentIds.length} related incident(s)`);
       }
       
       // Apply metric improvements from AI action immediately (partial)
@@ -723,7 +720,6 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
   );
   
   if (exists) {
-    console.warn('⚠️ Similar AI incident already active:', aiIncident.incidentName);
     return state;
   }
   
@@ -765,7 +761,6 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
   
   // Link related incidents bidirectionally
   if (relatedIncidents.length > 0) {
-    console.log(`🔗 Linking incident "${aiIncident.incidentName}" to ${relatedIncidents.length} related incident(s)`);
     relatedIncidents.forEach(relatedIncident => {
       if (!relatedIncident.relatedIncidentIds) {
         relatedIncident.relatedIncidentIds = [];
@@ -776,8 +771,6 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
       relatedIncident.rootCauseShared = true;
     });
   }
-  
-  console.log('✅ AI Incident Added:', aiIncident.incidentName);
   
   // Play sound based on severity
   if (aiIncident.severity === 'CRIT') {

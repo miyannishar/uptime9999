@@ -81,16 +81,13 @@ class AIGameMaster {
         content: response,
       });
       this.sessionStarted = true;
-      console.log('AI Game Master session started:', response);
     } catch (error) {
-      console.error('Failed to start AI session:', error);
       throw error;
     }
   }
 
   async generateIncident(currentState: GameState): Promise<AIIncidentResponse | null> {
     if (!this.sessionStarted) {
-      console.warn('⚠️ AI session not started yet');
       return null;
     }
 
@@ -183,19 +180,16 @@ class AIGameMaster {
       const incident = this.parseIncidentResponse(response);
       
       if (!incident) {
-        console.error('❌ Failed to parse incident from response');
         return null;
       }
       
       // Ensure incident matches the required severity (AI sometimes ignores instructions)
       if (incident.severity !== requiredSeverity) {
-        console.warn(`⚠️ AI returned severity ${incident.severity} but we requested ${requiredSeverity}, correcting...`);
         incident.severity = requiredSeverity;
       }
       
       return incident;
     } catch (error) {
-      console.error('💥 Exception during AI incident generation:', error);
       return null;
     }
   }
@@ -234,7 +228,6 @@ Analyze the effectiveness of this action and respond with a JSON object containi
 
       return this.parseMetricsUpdate(response);
     } catch (error) {
-      console.error('Failed to get AI metrics update:', error);
       return null;
     }
   }
@@ -572,10 +565,6 @@ Respond ONLY with JSON, no markdown formatting.`;
 
 
   private async callOpenAI(): Promise<string> {
-    console.log('📡 Calling OpenAI API...');
-    console.log('   Model: gpt-4o-mini');
-    console.log('   Messages in history:', this.conversationHistory.length);
-    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -592,12 +581,10 @@ Respond ONLY with JSON, no markdown formatting.`;
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('❌ OpenAI API error:', response.status, errorData);
       throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
-    console.log('✅ OpenAI response received');
     return data.choices[0].message.content;
   }
 
@@ -619,13 +606,11 @@ Respond ONLY with JSON, no markdown formatting.`;
       
       // Validate structure
       if (!parsed.incidentId || !parsed.incidentName || !parsed.targetNodeId) {
-        console.warn('Invalid AI incident response:', parsed);
         return null;
       }
 
       return parsed as AIIncidentResponse;
     } catch (error) {
-      console.error('Failed to parse AI incident response:', error, response);
       return null;
     }
   }
@@ -641,7 +626,6 @@ Respond ONLY with JSON, no markdown formatting.`;
       const parsed = JSON.parse(jsonStr);
       return parsed as AIMetricsUpdate;
     } catch (error) {
-      console.error('Failed to parse AI metrics update:', error);
       return null;
     }
   }
