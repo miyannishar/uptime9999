@@ -108,6 +108,40 @@ function App() {
     }
   }, [state.aiSessionActive]);
 
+  // Stop AI session when tab becomes hidden or closes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && stateRef.current.aiSessionActive) {
+        console.log('⏸️ Tab hidden - pausing AI session');
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      if (stateRef.current.aiSessionActive) {
+        console.log('🛑 Tab closing - stopping AI session');
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+      }
+    };
+
+    const handlePageHide = () => {
+      if (stateRef.current.aiSessionActive) {
+        console.log('🛑 Page hiding - stopping AI session');
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
+
   // Game loop - only run when AI is active
   useEffect(() => {
     if (!state.aiSessionActive) return;
@@ -118,7 +152,19 @@ function App() {
       // ALWAYS use stateRef.current to get the absolute latest state (includes user actions)
       const latestState = stateRef.current;
       
-      if (latestState.paused || latestState.gameOver || !latestState.aiSessionActive) return;
+      // Stop immediately if game over, paused, or AI session inactive
+      if (latestState.paused || latestState.gameOver || !latestState.aiSessionActive) {
+        // If game is over, stop AI session to prevent further requests
+        if (latestState.gameOver && latestState.aiSessionActive) {
+          dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+        }
+        return;
+      }
+
+      // Stop if tab is hidden (additional safety check)
+      if (document.hidden) {
+        return;
+      }
 
       const now = Date.now();
       const realDt = (now - lastTick) / 1000;
@@ -214,8 +260,22 @@ function App() {
       }
     }, 100); // 100ms tick
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Additional safety: stop AI session when component unmounts or AI session becomes inactive
+      if (stateRef.current.aiSessionActive) {
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+      }
+    };
   }, [state.aiSessionActive]); // Only run when AI is active
+
+  // Stop AI session when game is over
+  useEffect(() => {
+    if (state.gameOver && state.aiSessionActive) {
+      console.log('🛑 Game over - stopping AI session');
+      dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+    }
+  }, [state.gameOver, state.aiSessionActive]);
 
   // Check game over
   useEffect(() => {

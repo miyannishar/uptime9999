@@ -94,6 +94,11 @@ class AIGameMaster {
       return null;
     }
 
+    // Safety check: Don't generate incidents if game is over, paused, or AI session inactive
+    if (currentState.gameOver || currentState.paused || !currentState.aiSessionActive) {
+      return null;
+    }
+
     // Calculate game progress (0-1, based on elapsed time)
     // Start easy, ramp up difficulty over 10 minutes (600 seconds)
     const now = currentState.currentTime || Date.now();
