@@ -133,9 +133,9 @@ function App() {
     };
   }, []);
 
-  // Game loop - only run when AI is active
+  // Game loop - only run when AI is active and not paused
   useEffect(() => {
-    if (!state.aiSessionActive) return;
+    if (!state.aiSessionActive || state.paused || state.gameOver) return;
     
     let lastTick = Date.now();
 
@@ -191,12 +191,23 @@ function App() {
         // Silent - only log when spawning
         
         if (timeSinceLastAI > nextIncidentTime) {
+          // Double-check paused state before making API call
+          const currentState = stateRef.current;
+          if (currentState.paused || currentState.gameOver || !currentState.aiSessionActive || document.hidden) {
+            return;
+          }
+          
           aiLastIncidentRef.current = now; // Reset timer IMMEDIATELY to prevent spam
           
           const gameMaster = getAIGameMaster();
           if (gameMaster) {
             // Don't await - let it run async
             gameMaster.generateIncident(newState).then(aiIncident => {
+              // Check state again before processing result
+              const finalState = stateRef.current;
+              if (finalState.paused || finalState.gameOver || !finalState.aiSessionActive) {
+                return;
+              }
           if (aiIncident) {
             // Log incident to terminal (npm run dev terminal)
             tlog.error('');
@@ -251,7 +262,7 @@ function App() {
         dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
       }
     };
-  }, [state.aiSessionActive]); // Only run when AI is active
+  }, [state.aiSessionActive, state.paused, state.gameOver]); // Re-run when AI active, paused, or game over changes
 
   // Stop AI session when game is over
   useEffect(() => {
