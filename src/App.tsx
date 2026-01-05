@@ -84,23 +84,42 @@ function App() {
   }, [state]);
 
   // Always initialize AI Game Master on startup (AI mode is now default)
+  // Use a ref to track if we've already initialized to prevent multiple calls
+  const hasInitializedRef = useRef(false);
+  
   useEffect(() => {
-    if (!state.aiSessionActive) {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      
-      if (apiKey && apiKey.startsWith('sk-')) {
-        const gameMaster = initializeAIGameMaster(apiKey);
-        gameMaster.startSession(state).then(() => {
-          dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: true });
-        }).catch(err => {
-          alert(`Failed to initialize AI Game Master: ${err.message}\n\nThe game requires OpenAI API key to run.\n\nSteps:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\nCheck also:\n- API key is valid\n- You have OpenAI API credits\n- Network connection works`);
-        });
-      } else {
-        // Security: Never show the actual API key value in alerts
-        alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\n⚠️ SECURITY WARNING: This is a client-side app. API keys are bundled into the JavaScript.\nFor production, use a backend proxy to protect your API key.`);
-      }
+    // Only initialize once, and only if not already active
+    if (hasInitializedRef.current || state.aiSessionActive) {
+      return;
     }
-  }, [state.aiSessionActive]);
+    
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    
+    if (apiKey && apiKey.startsWith('sk-')) {
+      // Check if instance already exists and has started
+      const existingGameMaster = getAIGameMaster();
+      if (existingGameMaster && existingGameMaster.isSessionActive()) {
+        // Session already exists and is active, just mark as active
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: true });
+        hasInitializedRef.current = true;
+        return;
+      }
+      
+      // Create new instance only if needed
+      const gameMaster = initializeAIGameMaster(apiKey);
+      hasInitializedRef.current = true;
+      
+      gameMaster.startSession(state).then(() => {
+        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: true });
+      }).catch(err => {
+        hasInitializedRef.current = false; // Reset on error so it can retry
+        alert(`Failed to initialize AI Game Master: ${err.message}\n\nThe game requires OpenAI API key to run.\n\nSteps:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\nCheck also:\n- API key is valid\n- You have OpenAI API credits\n- Network connection works`);
+      });
+    } else {
+      // Security: Never show the actual API key value in alerts
+      alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\n⚠️ SECURITY WARNING: This is a client-side app. API keys are bundled into the JavaScript.\nFor production, use a backend proxy to protect your API key.`);
+    }
+  }, []); // Only run once on mount
 
   // Stop AI session when tab becomes hidden or closes
   useEffect(() => {

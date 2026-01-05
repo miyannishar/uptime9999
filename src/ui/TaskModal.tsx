@@ -16,6 +16,7 @@ interface TaskModalProps {
   actionName: string;
   actionDescription: string;
   targetNode: string;
+  isGamePaused?: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -26,6 +27,7 @@ export default function TaskModal({
   actionName,
   actionDescription,
   targetNode,
+  isGamePaused = false,
   onComplete,
   onClose,
 }: TaskModalProps) {
@@ -39,6 +41,13 @@ export default function TaskModal({
   const isGeneratingRef = useRef(false);
 
   useEffect(() => {
+    // Don't make API calls if game is paused
+    if (isGamePaused) {
+      setError('Game is paused. Please resume the game to generate tasks.');
+      setIsLoading(false);
+      return;
+    }
+    
     // Create a unique key for this task request
     const taskKey = `${incidentName}|${actionName}|${targetNode}`;
     
@@ -107,7 +116,7 @@ export default function TaskModal({
       // Instead, we only check if the taskKey matches
       isGeneratingRef.current = false;
     };
-  }, [incidentName, incidentDescription, actionName, actionDescription, targetNode]);
+  }, [incidentName, incidentDescription, actionName, actionDescription, targetNode, isGamePaused, taskData]);
 
   const handleTaskComplete = () => {
     setTaskCompleted(true);

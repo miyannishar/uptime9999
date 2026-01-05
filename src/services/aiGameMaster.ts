@@ -591,7 +591,11 @@ Respond JSON only.`;
 let gameMasterInstance: AIGameMaster | null = null;
 
 export function initializeAIGameMaster(apiKey: string): AIGameMaster {
-  gameMasterInstance = new AIGameMaster(apiKey);
+  // Only create new instance if one doesn't exist
+  // If instance exists and is already started, reuse it (don't create new one)
+  if (!gameMasterInstance) {
+    gameMasterInstance = new AIGameMaster(apiKey);
+  }
   return gameMasterInstance;
 }
 

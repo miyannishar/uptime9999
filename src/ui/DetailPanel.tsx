@@ -501,6 +501,7 @@ export default function DetailPanel({
           actionName={taskModalData.actionName}
           actionDescription={taskModalData.actionDescription}
           targetNode={taskModalData.targetNode}
+          isGamePaused={state.paused}
           onComplete={() => {
             setTaskModalOpen(false);
             // Execute the actual action after task completion
