@@ -365,9 +365,9 @@ export const DYNAMIC_ACTIONS: ActionDefinition[] = [
   // ===== COST OPTIMIZATION =====
   
   {
-    id: 'enable_autoscaling',
-    name: 'Enable Auto-Scaling',
-    description: 'Instances auto-add/remove based on load',
+    id: 'enable_dynamic_autoscaling',
+    name: 'Enable Dynamic Auto-Scaling',
+    description: 'Instances auto-add/remove based on real-time load',
     category: 'COST_OPTIMIZATION',
     target: 'global',
     oneTimeCost: 500,

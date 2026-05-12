@@ -16,9 +16,21 @@ import { tlog, isDebug } from './utils/terminalLog';
 import GameOverModal from './ui/GameOverModal';
 import { useResizable } from './hooks/useResizable';
 import { GAME_CONFIG } from './config/gameConfig';
+
+// Enhancement feature imports
+import StatusPage from './ui/StatusPage';
+import StakeholderComms from './ui/StakeholderComms';
+import PostMortem from './ui/PostMortem';
+import PagerAlert from './ui/PagerAlert';
+import IncidentTimeline from './ui/IncidentTimeline';
+import AchievementToast from './ui/AchievementToast';
+import { STAKEHOLDERS, StakeholderMetrics } from './data/stakeholders';
+import { ACHIEVEMENTS, AchievementMetrics, persistAchievements } from './data/achievements';
+
 import './styles/theme.css';
 import './styles/tasks.css';
 import './styles/taskHints.css';
+import './styles/enhancements.css';
 
 function App() {
   const [seed, setSeed] = useState(generateSeed());
@@ -30,6 +42,11 @@ function App() {
   const rngRef = useRef(new SeededRNG(seed));
   const stateRef = useRef(state);
   const aiLastIncidentRef = useRef(0);
+  
+  // Enhancement feature refs
+  const stakeholderCooldowns = useRef<Map<string, number>>(new Map());
+  const lowestReputationRef = useRef(100);
+  const lastIncidentCountRef = useRef(0);
   
   // Resizable panels (horizontal) - using config defaults
   const leftPanel = useResizable(
@@ -296,6 +313,153 @@ function App() {
     }
   }, [state.gameOver, showGameOver]);
 
+  // === Enhancement Features Logic ===
+  useEffect(() => {
+    if (!state.aiSessionActive || state.paused || state.gameOver) return;
+
+    const interval = setInterval(() => {
+      const s = stateRef.current;
+      if (s.paused || s.gameOver) return;
+      const now = Date.now();
+      const elapsed = (now - s.startTime) / 1000;
+
+      // Track lowest reputation for Phoenix achievement
+      if (s.reputation < lowestReputationRef.current) {
+        lowestReputationRef.current = s.reputation;
+      }
+
+      // --- Stakeholder Message Triggers ---
+      const critCount = s.activeIncidents.filter(i => i.severity === 'CRIT').length;
+      const warnCount = s.activeIncidents.filter(i => i.severity === 'WARN').length;
+      const metrics: StakeholderMetrics = {
+        reputation: s.reputation, uptime: s.uptime, cash: s.cash,
+        revenue: s.revenue, costs: s.costs, critCount, warnCount,
+        totalIncidents: s.totalIncidents, techDebt: s.techDebt,
+        burnout: s.burnout, users: s.users,
+        warRoomActive: s.warRoomActive, elapsedSeconds: elapsed,
+      };
+
+      STAKEHOLDERS.forEach(stakeholder => {
+        const lastSent = stakeholderCooldowns.current.get(stakeholder.id) || 0;
+        if (now - lastSent < stakeholder.cooldownMs) return;
+        if (s.stakeholderMessages.filter(m => !m.selectedResponse).length >= 3) return;
+        if (stakeholder.triggerCondition(metrics)) {
+          const { message, responses } = stakeholder.generateMessage(metrics);
+          stakeholderCooldowns.current.set(stakeholder.id, now);
+          dispatch({ type: 'LOAD_GAME', state: {
+            ...stateRef.current,
+            stakeholderMessages: [...stateRef.current.stakeholderMessages, {
+              id: `sh_${now}_${stakeholder.id}`, character: stakeholder.character,
+              icon: stakeholder.icon, message, responses, timestamp: now, expiresAt: now + 30000,
+            }],
+          }});
+        }
+      });
+
+      // --- Pager Trigger ---
+      if (!s.pagerActive && critCount > 0) {
+        const newestCrit = s.activeIncidents.filter(i => i.severity === 'CRIT')
+          .sort((a, b) => b.startTime - a.startTime)[0];
+        if (newestCrit) {
+          dispatch({ type: 'LOAD_GAME', state: {
+            ...stateRef.current, pagerActive: true, pagerIncidentId: newestCrit.id,
+            pagerAcknowledged: false, pagerStartTime: now,
+          }});
+        }
+      }
+      if (s.pagerActive && !s.pagerAcknowledged && (now - s.pagerStartTime) > 30000) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current, pagerActive: false, pagerAcknowledged: false,
+          reputation: Math.max(0, stateRef.current.reputation - 5),
+          burnout: Math.min(100, stateRef.current.burnout + 5),
+        }});
+      }
+      if (s.pagerActive && critCount === 0) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current, pagerActive: false, pagerAcknowledged: false,
+        }});
+      }
+
+      // --- War Room Mode ---
+      if (critCount >= 3 && !s.warRoomActive) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current, warRoomActive: true, warRoomStartTime: now,
+        }});
+      } else if (critCount < 3 && s.warRoomActive) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current, warRoomActive: false,
+          warRoomsSurvived: stateRef.current.warRoomsSurvived + 1,
+          reputation: Math.min(100, stateRef.current.reputation + 5),
+        }});
+      }
+
+      // --- Status Page Accuracy ---
+      const statusOrder = ['operational', 'degraded', 'partial_outage', 'major_outage'];
+      let expectedLevel: typeof s.statusPageLevel = 'operational';
+      if (critCount >= 2) expectedLevel = 'major_outage';
+      else if (critCount >= 1) expectedLevel = 'partial_outage';
+      else if (warnCount >= 2) expectedLevel = 'degraded';
+      if (statusOrder.indexOf(s.statusPageLevel) < statusOrder.indexOf(expectedLevel) - 1 && elapsed > 30) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current, reputation: Math.max(0, stateRef.current.reputation - 0.05),
+        }});
+      }
+
+      // --- Post-Mortem Queue ---
+      if (s.resolvedIncidents > lastIncidentCountRef.current) {
+        lastIncidentCountRef.current = s.resolvedIncidents;
+        if (s.resolvedIncidents % 3 === 0 && s.postMortemQueue.length === 0) {
+          const latest = s.incidentHistory[s.incidentHistory.length - 1];
+          if (latest && latest.severity === 'CRIT') {
+            dispatch({ type: 'LOAD_GAME', state: {
+              ...stateRef.current, postMortemQueue: [...stateRef.current.postMortemQueue, {
+                incidentName: latest.name, severity: latest.severity,
+                targetNode: latest.targetNode, startTime: latest.startTime,
+                resolvedTime: latest.endTime, userImpact: stateRef.current.users * 0.3,
+                revenueLost: stateRef.current.revenue * (latest.endTime - latest.startTime) / 1000 * 0.5,
+              }],
+            }});
+          }
+        }
+      }
+
+      // --- Achievement Checking ---
+      const appInstances = Array.from(s.architecture.nodes.values())
+        .filter(n => n.type === 'APP' && n.redundancyGroup === 'app_cluster').length;
+      const am: AchievementMetrics = {
+        uptime: s.uptime, uptimeStreak: s.uptimeStreak, reputation: s.reputation,
+        cash: s.cash, users: s.users, resolvedIncidents: s.resolvedIncidents,
+        totalIncidents: s.totalIncidents, warRoomsSurvived: s.warRoomsSurvived,
+        postMortemsCompleted: s.postMortemsCompleted, techDebt: s.techDebt,
+        elapsedSeconds: elapsed, activeIncidents: s.activeIncidents,
+        appInstances, lowestReputation: lowestReputationRef.current,
+        highestReputation: s.reputation,
+      };
+      ACHIEVEMENTS.forEach(a => {
+        if (!s.achievements.has(a.id) && a.check(am)) {
+          dispatch({ type: 'UNLOCK_ACHIEVEMENT', achievementId: a.id });
+          persistAchievements(new Set([...s.achievements, a.id]));
+        }
+      });
+
+      // --- Expire Stakeholder Messages ---
+      const expired = stateRef.current.stakeholderMessages.filter(
+        m => !m.selectedResponse && m.expiresAt <= now
+      );
+      if (expired.length > 0) {
+        dispatch({ type: 'LOAD_GAME', state: {
+          ...stateRef.current,
+          stakeholderMessages: stateRef.current.stakeholderMessages.filter(
+            m => m.selectedResponse !== undefined || m.expiresAt > now
+          ),
+          reputation: Math.max(0, stateRef.current.reputation - expired.length * 2),
+        }});
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [state.aiSessionActive, state.paused, state.gameOver]);
+
   const handleNewGame = () => {
     const newSeed = generateSeed();
     setSeed(newSeed);
@@ -308,7 +472,11 @@ function App() {
     // I6 FIX: Reset AI singleton for clean new game
     resetAIGameMaster();
     dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
-    hasInitializedRef.current = false; // Allow re-initialization
+    hasInitializedRef.current = false;
+    // Reset enhancement refs
+    stakeholderCooldowns.current = new Map();
+    lowestReputationRef.current = 100;
+    lastIncidentCountRef.current = 0;
   };
 
   const handleTogglePause = () => {
@@ -354,11 +522,17 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${state.warRoomActive ? 'war-room' : ''}`}>
       <HudBar
         state={state}
         onTogglePause={handleTogglePause}
         onNewGame={handleNewGame}
+      />
+
+      {/* Status Page Widget — sits below HUD */}
+      <StatusPage
+        state={state}
+        onUpdateStatus={(level, message) => dispatch({ type: 'UPDATE_STATUS_PAGE', level, message })}
       />
 
       <div className="main-layout">
@@ -418,8 +592,51 @@ function App() {
           onExecuteAction={handleExecuteAction}
         />
         
+        <IncidentTimeline state={state} />
+        
         <ActivityLog state={state} />
       </div>
+
+      {/* === Enhancement Overlays === */}
+
+      {/* Stakeholder Communications */}
+      <StakeholderComms
+        state={state}
+        onRespond={(messageId, idx) => dispatch({ type: 'RESPOND_STAKEHOLDER', messageId, responseIndex: idx })}
+        onDismiss={(messageId) => dispatch({ type: 'DISMISS_STAKEHOLDER', messageId })}
+      />
+
+      {/* Pager Alert */}
+      <PagerAlert
+        state={state}
+        onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE_PAGER' })}
+      />
+
+      {/* Post-Mortem Modal */}
+      {state.postMortemQueue.length > 0 && (
+        <PostMortem
+          incident={state.postMortemQueue[0]}
+          onComplete={(items) => dispatch({ type: 'COMPLETE_POSTMORTEM', actionItems: items })}
+          onSkip={() => dispatch({ type: 'SKIP_POSTMORTEM' })}
+        />
+      )}
+
+      {/* Achievement Toast */}
+      <AchievementToast
+        achievementId={state.recentAchievement}
+        timestamp={state.recentAchievementTime}
+      />
+
+      {/* War Room Banner */}
+      {state.warRoomActive && (
+        <div className="war-room-banner">
+          <span className="war-room-icon">🔴</span>
+          <span className="war-room-text">WAR ROOM ACTIVE</span>
+          <span className="war-room-timer">
+            {Math.floor((Date.now() - state.warRoomStartTime) / 1000)}s
+          </span>
+        </div>
+      )}
 
       {showGameOver && (
         <GameOverModal

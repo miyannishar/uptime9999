@@ -31,6 +31,12 @@ export function cloneGameState(state: GameState): GameState {
     activeIncidents: state.activeIncidents.map(inc => ({ ...inc })),
     actionsInProgress: state.actionsInProgress.map(act => ({ ...act })),
     uptimeWindow: [...state.uptimeWindow],
+    // Enhancement features
+    achievements: new Set(state.achievements),
+    stakeholderMessages: state.stakeholderMessages.map(m => ({ ...m, responses: [...m.responses] })),
+    postMortemQueue: state.postMortemQueue.map(p => ({ ...p })),
+    statusPageHistory: [...state.statusPageHistory],
+    incidentHistory: state.incidentHistory.map(h => ({ ...h })),
   };
 }
 

@@ -4,6 +4,7 @@ import { GameState, ActiveIncident, ComponentNode } from './types';
 import { SeededRNG } from './rng';
 import { ACTIONS } from '../data/actions';
 import { INCIDENTS } from '../data/incidents';
+import { applyStakeholderEffect } from '../data/stakeholders';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric } from './clampMetrics';
 import { soundNotifications } from '../utils/soundNotifications';
@@ -45,7 +46,15 @@ export type GameAction =
   | { type: 'SPAWN_AI_INCIDENT'; incident: any }
   | { type: 'NEW_GAME'; seed: string }
   | { type: 'LOAD_GAME'; state: GameState }
-  | { type: 'DEBUG_SPAWN_INCIDENT'; incidentId: string; targetNodeId: string };
+  | { type: 'DEBUG_SPAWN_INCIDENT'; incidentId: string; targetNodeId: string }
+  // Enhancement features
+  | { type: 'UPDATE_STATUS_PAGE'; level: GameState['statusPageLevel']; message: string }
+  | { type: 'RESPOND_STAKEHOLDER'; messageId: string; responseIndex: number }
+  | { type: 'DISMISS_STAKEHOLDER'; messageId: string }
+  | { type: 'ACKNOWLEDGE_PAGER' }
+  | { type: 'COMPLETE_POSTMORTEM'; actionItems: string[] }
+  | { type: 'SKIP_POSTMORTEM' }
+  | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string };
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
@@ -91,6 +100,96 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'EXECUTE_AI_ACTION':
       return executeAIAction(state, action.actionName, action.cost, action.duration, action.mitigatingIncidentId);
+
+    // === Enhancement Feature Handlers ===
+
+    case 'UPDATE_STATUS_PAGE':
+      return {
+        ...state,
+        statusPageLevel: action.level,
+        statusPageLastUpdated: Date.now(),
+        statusPageHistory: [
+          ...state.statusPageHistory,
+          { level: action.level, message: action.message, timestamp: Date.now() },
+        ].slice(-20), // Keep last 20
+      };
+
+    case 'RESPOND_STAKEHOLDER': {
+      const msg = state.stakeholderMessages.find(m => m.id === action.messageId);
+      if (!msg || action.responseIndex >= msg.responses.length) return state;
+      const effect = applyStakeholderEffect(msg.responses[action.responseIndex].effect);
+      return {
+        ...state,
+        reputation: Math.max(0, Math.min(100, state.reputation + effect.reputationDelta)),
+        burnout: Math.max(0, Math.min(100, state.burnout + effect.burnoutDelta)),
+        techDebt: Math.max(0, Math.min(100, state.techDebt + effect.techDebtDelta)),
+        cash: state.cash + effect.cashDelta,
+        stakeholderMessages: state.stakeholderMessages.map(m =>
+          m.id === action.messageId ? { ...m, selectedResponse: action.responseIndex } : m
+        ),
+      };
+    }
+
+    case 'DISMISS_STAKEHOLDER':
+      return {
+        ...state,
+        reputation: Math.max(0, state.reputation - 3), // Ignoring has consequences
+        burnout: Math.max(0, state.burnout - 2),
+        stakeholderMessages: state.stakeholderMessages.filter(m => m.id !== action.messageId),
+      };
+
+    case 'ACKNOWLEDGE_PAGER':
+      return {
+        ...state,
+        pagerAcknowledged: true,
+        reputation: Math.min(100, state.reputation + 2), // Prompt acknowledgement bonus
+      };
+
+    case 'COMPLETE_POSTMORTEM': {
+      const effects = {
+        reputationDelta: 5,
+        techDebtDelta: 0,
+        burnoutDelta: 0,
+      };
+      // Apply action item benefits
+      action.actionItems.forEach(item => {
+        switch (item) {
+          case 'circuit_breakers': effects.techDebtDelta -= 5; break;
+          case 'redundant_region': effects.reputationDelta += 5; break;
+          case 'chaos_testing': effects.techDebtDelta -= 3; break;
+          case 'runbook_update': effects.burnoutDelta -= 5; break;
+          case 'alert_tuning': break; // Alert fatigue handled separately
+          case 'capacity_planning': effects.reputationDelta += 3; break;
+          case 'postmortem_review': effects.reputationDelta += 2; effects.burnoutDelta -= 3; break;
+        }
+      });
+      return {
+        ...state,
+        postMortemQueue: state.postMortemQueue.slice(1),
+        postMortemsCompleted: state.postMortemsCompleted + 1,
+        reputation: Math.max(0, Math.min(100, state.reputation + effects.reputationDelta)),
+        techDebt: Math.max(0, Math.min(100, state.techDebt + effects.techDebtDelta)),
+        burnout: Math.max(0, Math.min(100, state.burnout + effects.burnoutDelta)),
+        alertFatigue: action.actionItems.includes('alert_tuning')
+          ? Math.max(0, state.alertFatigue - 5)
+          : state.alertFatigue,
+      };
+    }
+
+    case 'SKIP_POSTMORTEM':
+      return {
+        ...state,
+        postMortemQueue: state.postMortemQueue.slice(1),
+      };
+
+    case 'UNLOCK_ACHIEVEMENT':
+      if (state.achievements.has(action.achievementId)) return state;
+      return {
+        ...state,
+        achievements: new Set([...state.achievements, action.achievementId]),
+        recentAchievement: action.achievementId,
+        recentAchievementTime: Date.now(),
+      };
 
     default:
       return state;

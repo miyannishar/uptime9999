@@ -1,4 +1,36 @@
 // Task Generator - Uses OpenAI to generate interactive technical tasks
+import { GAME_CONFIG } from '../config/gameConfig';
+
+// A6 FIX: Shared API call tracking with aiGameMaster
+// Prevents task generation from bypassing session limits
+let taskApiCallCount = 0;
+let taskSessionStart = 0;
+
+export function resetTaskApiTracking() {
+  taskApiCallCount = 0;
+  taskSessionStart = 0;
+}
+
+export function getTaskApiCallCount() {
+  return taskApiCallCount;
+}
+
+function shouldAllowTaskApiCall(): boolean {
+  const cfg = GAME_CONFIG.session;
+  const now = Date.now();
+  
+  // Cap task-specific calls at 25% of total budget
+  if (taskApiCallCount >= Math.floor(cfg.maxApiCalls * 0.25)) {
+    return false;
+  }
+  
+  // Respect session duration limit
+  if (taskSessionStart > 0 && (now - taskSessionStart) >= cfg.maxDurationMs) {
+    return false;
+  }
+  
+  return true;
+}
 
 export interface TaskData {
   type: 'config' | 'log' | 'terminal' | 'code' | 'button-sequence' | 'drag-drop' | 'multi-choice' | 'diagram' | 'monitor';
@@ -176,6 +208,17 @@ Target Node: ${targetNode}
 Generate ONE appropriate interactive task. Respond with JSON only.`;
 
   try {
+    // A6 FIX: Check session limits before making API call
+    if (!shouldAllowTaskApiCall()) {
+      console.warn('[TaskGenerator] API call budget exhausted, skipping task generation');
+      return null;
+    }
+    
+    if (taskSessionStart === 0) {
+      taskSessionStart = Date.now();
+    }
+    taskApiCallCount++;
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {

@@ -138,9 +138,9 @@ export const COST_SAVING_ACTIONS: ActionDefinition[] = [
   },
 
   {
-    id: 'marketing_campaign',
-    name: '📣 Marketing Campaign',
-    description: 'Boost user acquisition (costs money but grows users)',
+    id: 'growth_marketing_campaign',
+    name: '📣 Growth Marketing Campaign',
+    description: 'Boost user acquisition aggressively (costs money but grows users fast)',
     category: 'REVENUE',
     target: 'global',
     oneTimeCost: 1000,

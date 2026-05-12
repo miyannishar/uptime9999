@@ -323,7 +323,7 @@ DYNAMIC ARCHITECTURE AWARENESS:
 - If a redundancy group has multiple healthy instances, system can survive one instance failure
 - Consider instance count when generating incidents (more instances = more resilient but more complex)
 
-Components: app, cache, workers, db_primary, db_replica, queue, cdn, waf, dns, apigw, glb, rlb, storage, service_mesh, observability
+Components: dns, cdn, waf, glb, rlb, apigw, app, cache, workers, db_primary, db_replica, queue, object_storage, observability, service_mesh
 + Dynamic instances: app_2, worker_2, db_replica_2, cache_2, etc.
 + Split services: auth, payment, notification, search (if player created them)
 Metrics examples: hitRate, queueBacklog, connections, cpu, instances, instanceNumber, redundancyGroup
@@ -333,7 +333,7 @@ Requirements:
 2. Include "logs" field (5-7 lines)
 3. Use "metricEffects" to degrade metrics
 4. Actions with "metricImprovements" (no "Monitor"/"Review")
-5. Vary severity: INFO 50%, WARN 30%, CRIT 20%
+5. You will be told the EXACT severity to use. Follow it exactly.
 
 INCIDENT GENERATION RULES:
 - **DIVERSIFY TARGETS**: Look at nodeMetrics and choose different nodes each time
@@ -352,19 +352,14 @@ INCIDENT GENERATION RULES:
   * If player fixed a node, health improves - acknowledge this
   * Create narrative continuity - reference previous incidents/actions
 - **SEVERITY BALANCE**:
-  * INFO: 50% (30% minor issues/warnings, 20% profit optimization opportunities)
-  * WARN: 30% (moderate problems requiring attention)
-  * CRIT: 20% (serious threats, outages, escalations)
-- **VARY SEVERITY INTELLIGENTLY**:
-  * Use INFO (40% of time) for minor issues when system is healthy
-  * Use WARN (40% of time) for moderate problems
-  * Use CRIT (20% of time) for serious threats, especially if player ignores WARNs
+   * You will receive the required severity level in each request. ALWAYS use it exactly.
+   * Never override or change the requested severity.
 - **MAKE EFFECTS IMPACTFUL BUT FAIR**:
-  * CRIT: errorMultiplier 2-3x, latencyMultiplier 2-2.5x, healthDecayPerSec 0.001-0.003 (MAX per incident)
-  * WARN: errorMultiplier 1.3-1.8x, latencyMultiplier 1.2-1.6x, healthDecayPerSec 0.0005-0.001 (optional)
-  * INFO: latencyMultiplier 1.1-1.3x only, NO health decay
-  * INFO (Optimization): NO negative effects! These are profit opportunities - use NO metricEffects or only positive ones
-  * NOTE: Multiple incidents can stack, so keep healthDecayPerSec LOW (0.001-0.003 max per incident)
+   * CRIT: errorMultiplier 2-3x, latencyMultiplier 2-2.5x, healthDecayPerSec 0.001-0.003 (MAX per incident)
+   * WARN: errorMultiplier 1.3-1.8x, latencyMultiplier 1.2-1.6x, healthDecayPerSec 0.0005-0.001 (optional)
+   * INFO: latencyMultiplier 1.1-1.3x only, NO health decay
+   * INFO (Optimization): NO negative effects! These are profit opportunities
+   * IMPORTANT: healthDecayPerSec MUST be 0.003 or less. NEVER use 0.01, 0.05, or higher!
 - **USE COMPONENT-SPECIFIC METRIC EFFECTS**:
   * For CACHE incidents: Affect hitRate, evictionRate, sizeGB, keysStored
   * For WORKERS incidents: Affect queueBacklog, jobsProcessedPerSec, failedJobsPercent, avgJobDuration
@@ -394,13 +389,12 @@ Always respond in valid JSON format with this structure:
     "errorMultiplier": 1.5,
     "latencyMultiplier": 1.3,
     "utilizationMultiplier": 2.0,
-    "healthDecayPerSec": 0.01,
+    "healthDecayPerSec": 0.002,
     "metricEffects": {
       "hitRate": -0.25,
       "evictionRate": 100,
       "queueBacklog": 50
     }
-  }
   NOTE: For "OPTIMIZATION" category incidents, use NO metricEffects (or only positive ones) - these are profit opportunities, not problems!
     NOTE: Use plain numbers (e.g., 100, -50, 0.15) NOT +100 or +50 in JSON!
   },

@@ -91,6 +91,31 @@ export function createInitialState(seed: string): GameState {
 
     totalProfit: 0,
     totalIncidents: 0,
+
+    // Enhancement features
+    statusPageLevel: 'operational',
+    statusPageLastUpdated: startTime,
+    statusPageHistory: [],
+
+    stakeholderMessages: [],
+
+    postMortemQueue: [],
+    postMortemsCompleted: 0,
+
+    pagerActive: false,
+    pagerIncidentId: null,
+    pagerAcknowledged: false,
+    pagerStartTime: 0,
+
+    warRoomActive: false,
+    warRoomStartTime: 0,
+    warRoomsSurvived: 0,
+
+    achievements: new Set(),
+    recentAchievement: null,
+    recentAchievementTime: 0,
+
+    incidentHistory: [],
   };
 }
 
@@ -183,13 +208,13 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
   // === 9. RESOLVE INCIDENTS ===
   updateIncidents(newState, dt);
 
-  // === 9. UPDATE ACTIONS ===
+  // === 10. UPDATE ACTIONS ===
   updateActions(newState, dt);
 
-  // === 10. CHECK GAME OVER ===
+  // === 11. CHECK GAME OVER ===
   checkGameOver(newState);
 
-  // === 11. UPDATE STRESS ===
+  // === 12. UPDATE STRESS ===
   updateStress(newState, dt);
 
   return newState;
@@ -808,6 +833,7 @@ function updateIncidents(state: GameState, _dt: number) {
         state.resolvedIncidents++;
         incidentsResolvedThisTick++;
         wasResolved = true;
+        state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       }
 
       // Fully mitigated (player resolved it!)
@@ -815,6 +841,7 @@ function updateIncidents(state: GameState, _dt: number) {
         state.resolvedIncidents++;
         incidentsResolvedThisTick++;
         wasResolved = true;
+        state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
         
         // O4: Direct call instead of dynamic import
         tlog.success(`🎉 Incident resolved! Reputation +${incident.severity === 'CRIT' ? '5' : incident.severity === 'WARN' ? '3' : '1'}`);
@@ -833,6 +860,7 @@ function updateIncidents(state: GameState, _dt: number) {
     if (incidentDef.autoResolveSeconds && elapsed > incidentDef.autoResolveSeconds) {
       state.resolvedIncidents++;
       incidentsResolvedThisTick++;
+      state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       return false;
     }
 
@@ -840,6 +868,7 @@ function updateIncidents(state: GameState, _dt: number) {
     if (incident.mitigationLevel >= 1.0) {
       state.resolvedIncidents++;
       incidentsResolvedThisTick++;
+      state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
       return false;
     }
 

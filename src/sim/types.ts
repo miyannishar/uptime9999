@@ -300,6 +300,64 @@ export interface GameState {
   // Run stats
   totalProfit: number;
   totalIncidents: number;
+
+  // === ENHANCEMENT FEATURES ===
+  
+  // Status Page
+  statusPageLevel: 'operational' | 'degraded' | 'partial_outage' | 'major_outage';
+  statusPageLastUpdated: number;
+  statusPageHistory: Array<{ level: string; message: string; timestamp: number }>;
+
+  // Stakeholder Communications
+  stakeholderMessages: Array<{
+    id: string;
+    character: string;
+    icon: string;
+    message: string;
+    responses: Array<{ text: string; effect: string }>;
+    selectedResponse?: number;
+    timestamp: number;
+    expiresAt: number;
+  }>;
+
+  // Post-Mortem
+  postMortemQueue: Array<{
+    incidentName: string;
+    severity: string;
+    targetNode: string;
+    startTime: number;
+    resolvedTime: number;
+    userImpact: number;
+    revenueLost: number;
+  }>;
+  postMortemsCompleted: number;
+
+  // Pager
+  pagerActive: boolean;
+  pagerIncidentId: string | null;
+  pagerAcknowledged: boolean;
+  pagerStartTime: number;
+
+  // War Room
+  warRoomActive: boolean;
+  warRoomStartTime: number;
+  warRoomsSurvived: number;
+
+  // Achievements
+  achievements: Set<string>;
+  recentAchievement: string | null;
+  recentAchievementTime: number;
+
+  // Incident History (for timeline)
+  incidentHistory: Array<{
+    id: string;
+    name: string;
+    severity: string;
+    targetNode: string;
+    startTime: number;
+    endTime: number;
+    wasResolved: boolean;
+  }>;
 }
 
 export interface RunSummary {
