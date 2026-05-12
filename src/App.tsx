@@ -2,7 +2,7 @@ import React, { useReducer, useEffect, useRef, useState } from 'react';
 import { createInitialState, tickSimulation } from './sim/engine';
 import { gameReducer } from './sim/reducer';
 import { SeededRNG, generateSeed } from './sim/rng';
-import { initializeAIGameMaster, getAIGameMaster } from './services/aiGameMaster';
+import { initializeAIGameMaster, getAIGameMaster, resetAIGameMaster } from './services/aiGameMaster';
 import { ACTIONS } from './data/actions';
 
 import HudBar from './ui/HudBar';
@@ -121,11 +121,18 @@ function App() {
     }
   }, []); // Only run once on mount
 
-  // Stop AI session when tab becomes hidden or closes
+  // C4.2 FIX: Auto-PAUSE on tab hide instead of killing the session
+  // Resume when tab becomes visible again
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && stateRef.current.aiSessionActive) {
-        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+      if (document.hidden && stateRef.current.aiSessionActive && !stateRef.current.paused) {
+        // Auto-pause when tab is hidden (don't kill session)
+        dispatch({ type: 'TOGGLE_PAUSE' });
+        // Mark as auto-paused so we can auto-resume
+        dispatch({ type: 'LOAD_GAME', state: { ...stateRef.current, autoPaused: true, paused: true } });
+      } else if (!document.hidden && stateRef.current.autoPaused) {
+        // Auto-resume when tab becomes visible again
+        dispatch({ type: 'LOAD_GAME', state: { ...stateRef.current, autoPaused: false, paused: false } });
       }
     };
 
@@ -135,20 +142,12 @@ function App() {
       }
     };
 
-    const handlePageHide = () => {
-      if (stateRef.current.aiSessionActive) {
-        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
-      }
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 
@@ -219,7 +218,7 @@ function App() {
           aiLastIncidentRef.current = now; // Reset timer IMMEDIATELY to prevent spam
           
           const gameMaster = getAIGameMaster();
-          if (gameMaster) {
+          if (gameMaster && gameMaster.shouldMakeApiCall()) {
             // Don't await - let it run async
             gameMaster.generateIncident(newState).then(aiIncident => {
               // Check state again before processing result
@@ -306,8 +305,10 @@ function App() {
     setShowGameOver(false);
     setSelectedNode(null);
     setSelectedIncident(null);
-    // Reset AI session
+    // I6 FIX: Reset AI singleton for clean new game
+    resetAIGameMaster();
     dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
+    hasInitializedRef.current = false; // Allow re-initialization
   };
 
   const handleTogglePause = () => {

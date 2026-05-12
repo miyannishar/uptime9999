@@ -74,9 +74,9 @@ export function computeRevenue(
 ): number {
   const reputationFactor = reputation / 100;
   
-  // Less harsh uptime penalty - linear instead of quadratic
-  // Still get 80% revenue at 80% uptime, 50% at 50% uptime
-  const uptimeFactor = Math.max(0.3, uptime); // Never go below 30% revenue
+  // BAL-2 FIX: Steeper uptime penalty — low uptime should hurt financially
+  // At 100% uptime: 100% revenue, at 90%: 81%, at 80%: 64%, at 50%: 25%
+  const uptimeFactor = Math.max(0.2, Math.pow(uptime, 2));
   
   const baseRevenue = users * pricing / 86400; // pricing is per day
   return baseRevenue * reputationFactor * uptimeFactor;
@@ -140,13 +140,13 @@ export function computeReputationDelta(
     delta += cfg.baseRecovery;
   }
   
-  // Uptime bonus/penalty
+  // BUG-2 FIX: Use consistent descending threshold pattern
   const uptimeThresh = cfg.uptimeThresholds;
   if (uptime > uptimeThresh.excellent.threshold) delta += uptimeThresh.excellent.bonus;
   else if (uptime > uptimeThresh.good.threshold) delta += uptimeThresh.good.bonus;
   else if (uptime > uptimeThresh.acceptable.threshold) delta += uptimeThresh.acceptable.bonus;
-  else if (uptime < uptimeThresh.poor.threshold) delta += uptimeThresh.poor.penalty;
-  else if (uptime < uptimeThresh.acceptable.threshold) delta += uptimeThresh.bad.penalty;
+  else if (uptime > uptimeThresh.poor.threshold) delta += uptimeThresh.bad.penalty;
+  else delta += uptimeThresh.poor.penalty;
   
   // Error rate penalty
   const errorPen = cfg.errorPenalties;

@@ -4,7 +4,7 @@ export const GAME_CONFIG = {
   // === STARTING STATE ===
   starting: {
     users: 10000,
-    cash: 4000, // Reduced from 20000 - makes spending decisions meaningful
+    cash: 15000, // Increased from 8000: compensates for steeper uptime-revenue curve
     pricing: 25, // $ per user per day
     reputation: 80,
     techDebt: 0,
@@ -15,7 +15,7 @@ export const GAME_CONFIG = {
   // === ECONOMIC BALANCE ===
   economy: {
     revenuePerUserPerDay: 25,
-    bankruptcyThreshold: -2000,
+    bankruptcyThreshold: -5000,
     reputationGameOverGracePeriod: 60, // seconds at 0 before game over
   },
 
@@ -58,8 +58,8 @@ export const GAME_CONFIG = {
   // === INCIDENT SYSTEM ===
   incidents: {
     baseDifficultyMultiplier: 1.0,
-    maxDifficultyMultiplier: 1.5,
-    difficultyTimeScale: 3600, // seconds to max difficulty
+    maxDifficultyMultiplier: 2.5, // BAL-8: Increased from 1.5 for meaningful late-game challenge
+    difficultyTimeScale: 1800, // BAL-8: 30 minutes to max difficulty (was 3600)
     difficultyUserThresholds: {
       high: { users: 200000, multiplier: 1.2 },
       medium: { users: 100000, multiplier: 1.1 },
@@ -83,6 +83,21 @@ export const GAME_CONFIG = {
     },
     // Immediate mitigation when action starts (gives player hope)
     immediateMitigationOnActionStart: 0.3, // 30% mitigation applied immediately when action starts
+  },
+
+  // === SESSION MANAGEMENT ===
+  session: {
+    maxDurationMs: 30 * 60 * 1000, // 30 minute hard cap
+    maxApiCalls: 200, // Max OpenAI calls per session
+    inactivityTimeoutMs: 5 * 60 * 1000, // 5 min idle → auto-end
+    calmPeriodAfterCritMs: 30000, // 30 second breather after resolving CRIT
+  },
+
+  // === METRIC RECOVERY ===
+  metricRecovery: {
+    baseRecoveryRate: 0.03, // 3%/sec recovery toward baseline when no incident
+    incidentRecoveryRate: 0.01, // 1%/sec partial recovery even during incidents
+    healthRecoveryDuringIncident: 0.3, // 30% of normal health recovery rate during incidents
   },
 
   // === ACTION TIMINGS ===

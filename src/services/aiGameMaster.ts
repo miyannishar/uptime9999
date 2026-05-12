@@ -2,6 +2,8 @@
 
 import { GameState } from '../sim/types';
 
+import { GAME_CONFIG } from '../config/gameConfig';
+
 export interface AIIncidentResponse {
   incidentId: string;
   incidentName: string;
@@ -53,37 +55,71 @@ class AIGameMaster {
   private conversationHistory: ConversationMessage[] = [];
   private sessionStarted: boolean = false;
   private incidentCount: number = 0;
+  
+  // C4 FIX: Session management
+  private sessionStartTime: number = 0;
+  private totalApiCalls: number = 0;
+  private estimatedTokensUsed: number = 0;
+  private estimatedCostUSD: number = 0;
+  private lastApiCallTime: number = 0;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
+  // C4: Check if we should make an API call (within limits)
+  shouldMakeApiCall(): boolean {
+    const cfg = GAME_CONFIG.session;
+    const now = Date.now();
+    
+    // Check call count
+    if (this.totalApiCalls >= cfg.maxApiCalls) {
+      return false;
+    }
+    
+    // Check session duration
+    if (this.sessionStartTime > 0 && (now - this.sessionStartTime) >= cfg.maxDurationMs) {
+      return false;
+    }
+    
+    // Check inactivity (if last call was too long ago, something's wrong)
+    if (this.lastApiCallTime > 0 && (now - this.lastApiCallTime) >= cfg.inactivityTimeoutMs) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Token usage tracking
+  getTokenUsage() {
+    return {
+      totalCalls: this.totalApiCalls,
+      estimatedTokens: this.estimatedTokensUsed,
+      estimatedCostUSD: this.estimatedCostUSD,
+      sessionDurationMs: this.sessionStartTime > 0 ? Date.now() - this.sessionStartTime : 0,
+    };
+  }
+
   async startSession(initialState: GameState): Promise<void> {
     if (this.sessionStarted) return;
 
+    // C4.4 FIX: Don't make a wasted API call here.
+    // Just set the system prompt and mark the session as ready.
+    // The first real call will happen in generateIncident().
     const systemPrompt = this.buildSystemPrompt(initialState);
     this.conversationHistory = [
       {
         role: 'system',
         content: systemPrompt,
       },
-      {
-        role: 'user',
-        content: `Game session started. Initial state: ${this.serializeGameState(initialState)}. Begin monitoring and prepare to generate contextual incidents.`,
-      },
     ];
 
-    // Get initial response
-    try {
-      const response = await this.callOpenAI();
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response,
-      });
-      this.sessionStarted = true;
-    } catch (error) {
-      throw error;
-    }
+    this.sessionStarted = true;
+    this.sessionStartTime = Date.now();
+    this.totalApiCalls = 0;
+    this.estimatedTokensUsed = 0;
+    this.estimatedCostUSD = 0;
+    this.lastApiCallTime = Date.now();
   }
 
   async generateIncident(currentState: GameState): Promise<AIIncidentResponse | null> {
@@ -95,6 +131,16 @@ class AIGameMaster {
     if (currentState.gameOver || currentState.paused || !currentState.aiSessionActive) {
       return null;
     }
+    
+    // C4: Check API call limits
+    if (!this.shouldMakeApiCall()) {
+      return null;
+    }
+
+    // BREATHER: Don't generate during calm period
+    if (currentState.lastCalmPeriodEnd && Date.now() < currentState.lastCalmPeriodEnd) {
+      return null;
+    }
 
     // Calculate game progress (0-1, based on elapsed time)
     // Start easy, ramp up difficulty over 10 minutes (600 seconds)
@@ -102,39 +148,59 @@ class AIGameMaster {
     const elapsedSeconds = (now - currentState.startTime) / 1000;
     const gameProgress = Math.min(1.0, elapsedSeconds / 600); // 0 at start, 1.0 after 10 minutes
 
-    // Progressive difficulty: early game = mostly INFO/WARN, late game = more CRIT
-    // Early game (0-2 min): INFO 60%, WARN 35%, CRIT 5%
-    // Mid game (2-5 min): INFO 30%, WARN 50%, CRIT 20%
-    // Late game (5-10 min): INFO 15%, WARN 35%, CRIT 50%
+    // ADAPTIVE DIFFICULTY: Back off when player is struggling
+    const activeCount = currentState.activeIncidents.length;
+    const isStruggling = activeCount >= 4 || currentState.cash < 500;
+    const isCruising = activeCount < 2 && currentState.uptime > 0.95 && currentState.cash > 3000;
+
+    // M2 FIX: Rebalanced severity distribution
+    // Early game (0-3 min): INFO 60%, WARN 35%, CRIT 5%
+    // Mid game (3-5 min): INFO 30%, WARN 50%, CRIT 20%
+    // Mid-late (5-8 min): INFO 25%, WARN 45%, CRIT 30% (was 50%)
+    // Late game (8+ min): INFO 20%, WARN 45%, CRIT 35% (capped from 50%)
     const severityRoll = Math.random();
     let requiredSeverity: 'INFO' | 'WARN' | 'CRIT';
     
-    if (gameProgress < 0.33) {
-      // Early game (0-2 min): Easy mode
+    // Override: struggling player never gets CRIT
+    if (isStruggling) {
+      requiredSeverity = severityRoll < 0.6 ? 'INFO' : 'WARN';
+    } else if (gameProgress < 0.3) {
+      // Early game (0-3 min): Easy mode
       if (severityRoll < 0.05) {
-        requiredSeverity = 'CRIT'; // 5% chance
+        requiredSeverity = 'CRIT';
       } else if (severityRoll < 0.40) {
-        requiredSeverity = 'WARN'; // 35% chance
+        requiredSeverity = 'WARN';
       } else {
-        requiredSeverity = 'INFO'; // 60% chance
+        requiredSeverity = 'INFO';
       }
-    } else if (gameProgress < 0.83) {
-      // Mid game (2-5 min): Moderate difficulty
+    } else if (gameProgress < 0.5) {
+      // Mid game (3-5 min): Moderate
       if (severityRoll < 0.20) {
-        requiredSeverity = 'CRIT'; // 20% chance
+        requiredSeverity = 'CRIT';
       } else if (severityRoll < 0.70) {
-        requiredSeverity = 'WARN'; // 50% chance
+        requiredSeverity = 'WARN';
       } else {
-        requiredSeverity = 'INFO'; // 30% chance
+        requiredSeverity = 'INFO';
+      }
+    } else if (gameProgress < 0.8) {
+      // Mid-late game (5-8 min): Harder
+      const critThreshold = isCruising ? 0.30 : 0.25;
+      if (severityRoll < critThreshold) {
+        requiredSeverity = 'CRIT';
+      } else if (severityRoll < critThreshold + 0.45) {
+        requiredSeverity = 'WARN';
+      } else {
+        requiredSeverity = 'INFO';
       }
     } else {
-      // Late game (5-10+ min): Hard mode
-      if (severityRoll < 0.50) {
-        requiredSeverity = 'CRIT'; // 50% chance
-      } else if (severityRoll < 0.85) {
-        requiredSeverity = 'WARN'; // 35% chance
+      // Late game (8+ min): Hard but fair — CRIT capped at 35%
+      const critThreshold = isCruising ? 0.35 : 0.30;
+      if (severityRoll < critThreshold) {
+        requiredSeverity = 'CRIT';
+      } else if (severityRoll < critThreshold + 0.45) {
+        requiredSeverity = 'WARN';
       } else {
-        requiredSeverity = 'INFO'; // 15% chance
+        requiredSeverity = 'INFO';
       }
     }
 
@@ -490,6 +556,10 @@ Respond JSON only.`;
 
 
   private async callOpenAI(): Promise<string> {
+    // Track call
+    this.totalApiCalls++;
+    this.lastApiCallTime = Date.now();
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -510,6 +580,15 @@ Respond JSON only.`;
 
     if (!response.ok) {
       throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(responseData)}`);
+    }
+
+    // Track token usage from response
+    if (responseData.usage) {
+      const tokens = responseData.usage.total_tokens || 0;
+      this.estimatedTokensUsed += tokens;
+      // gpt-4o-mini: ~$0.15/1M input, ~$0.60/1M output
+      this.estimatedCostUSD += (responseData.usage.prompt_tokens || 0) * 0.00000015 
+                             + (responseData.usage.completion_tokens || 0) * 0.0000006;
     }
 
     return responseData.choices[0].message.content;
@@ -569,21 +648,10 @@ Respond JSON only.`;
     return this.sessionStarted;
   }
 
-  // Add user action to history (for non-AI actions too)
-  logUserAction(actionName: string, targetNode: string, context: string = ''): void {
-    const logMessage = `[Player Action] ${actionName} on ${targetNode}. ${context}`;
-    this.conversationHistory.push({
-      role: 'user',
-      content: logMessage,
-    });
-    
-    // Keep history manageable - trim to last 20 messages to avoid context window issues
-    if (this.conversationHistory.length > 21) { // Keep system + 20 messages
-      this.conversationHistory = [
-        this.conversationHistory[0], // Keep system prompt
-        ...this.conversationHistory.slice(-20),
-      ];
-    }
+  // C4.5 FIX: logUserAction is dead code — history gets reset to system prompt before each call.
+  // Removed the push to conversationHistory. Keeping method signature for backward compat.
+  logUserAction(_actionName: string, _targetNode: string, _context: string = ''): void {
+    // No-op: conversation history is reset before each API call anyway
   }
 }
 
@@ -601,5 +669,10 @@ export function initializeAIGameMaster(apiKey: string): AIGameMaster {
 
 export function getAIGameMaster(): AIGameMaster | null {
   return gameMasterInstance;
+}
+
+// I6 FIX: Reset singleton for clean new game
+export function resetAIGameMaster(): void {
+  gameMasterInstance = null;
 }
 

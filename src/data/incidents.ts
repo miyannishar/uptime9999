@@ -106,6 +106,7 @@ export const INCIDENTS: IncidentDefinition[] = [
       errorMultiplier: 1.5,
     },
     resolutionOptions: ['rotate_secrets', 'enable_secrets_manager'],
+    autoResolveSeconds: 600,
   },
   {
     id: 'waf_bypass_attempt',
@@ -152,6 +153,7 @@ export const INCIDENTS: IncidentDefinition[] = [
       healthDecayPerSec: 0.01,
     },
     resolutionOptions: ['patch_dependency', 'security_audit'],
+    autoResolveSeconds: 480,
   },
 
   // === DEPLOY/CONFIG ===
@@ -375,6 +377,7 @@ export const INCIDENTS: IncidentDefinition[] = [
     },
     timeToOutageSeconds: 90,
     resolutionOptions: ['scale_app_2', 'scale_app_vertical'],
+    autoResolveSeconds: 300,
   },
   {
     id: 'network_saturation',
@@ -414,6 +417,7 @@ export const INCIDENTS: IncidentDefinition[] = [
     },
     timeToOutageSeconds: 150,
     resolutionOptions: ['increase_db_connections', 'add_connection_pooler'],
+    autoResolveSeconds: 480,
   },
   {
     id: 'slow_queries',
@@ -482,6 +486,7 @@ export const INCIDENTS: IncidentDefinition[] = [
     },
     timeToOutageSeconds: 60,
     resolutionOptions: ['scale_db_vertical'],
+    autoResolveSeconds: 360,
   },
   {
     id: 'db_backup_failure',
@@ -530,6 +535,7 @@ export const INCIDENTS: IncidentDefinition[] = [
       errorMultiplier: 2.0,
     },
     resolutionOptions: ['pause_workers', 'rollback_deploy'],
+    autoResolveSeconds: 300,
   },
   {
     id: 'worker_crash_loop',
@@ -548,6 +554,7 @@ export const INCIDENTS: IncidentDefinition[] = [
     },
     timeToOutageSeconds: 180,
     resolutionOptions: ['rollback_deploy', 'pause_workers'],
+    autoResolveSeconds: 360,
   },
   {
     id: 'queue_dlq_full',
@@ -740,6 +747,7 @@ export const INCIDENTS: IncidentDefinition[] = [
     },
     timeToOutageSeconds: 120,
     resolutionOptions: ['enable_circuit_breaker', 'scale_app_5'],
+    autoResolveSeconds: 300,
   },
   {
     id: 'complete_outage',
@@ -764,6 +772,7 @@ export const INCIDENTS: IncidentDefinition[] = [
       'restart_database',
       'flush_cache',
     ],
+    autoResolveSeconds: 600,
   },
 ];
 

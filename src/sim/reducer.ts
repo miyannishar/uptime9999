@@ -8,6 +8,30 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric } from './clampMetrics';
 import { soundNotifications } from '../utils/soundNotifications';
 import { createComponentNode } from './componentInitializer';
+import { cloneGameState } from '../utils/stateUtils';
+import { tlog } from '../utils/terminalLog';
+
+/**
+ * O3: Shared helper for applying mitigation to related incidents (same root cause).
+ * Used in 4 places: action start, instant action, AI action, and action completion.
+ */
+export function applyRelatedMitigation(
+  activeIncidents: ActiveIncident[],
+  incident: ActiveIncident,
+  mitigationAmount: number
+): void {
+  if (!incident.relatedIncidentIds || incident.relatedIncidentIds.length === 0) return;
+  
+  incident.relatedIncidentIds.forEach(relatedId => {
+    const relatedIncident = activeIncidents.find(i => i.id === relatedId);
+    if (relatedIncident) {
+      relatedIncident.mitigationLevel = Math.min(1.0, relatedIncident.mitigationLevel + mitigationAmount);
+      relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
+    }
+  });
+  
+  tlog.success(`🔗 Fully mitigated ${incident.relatedIncidentIds.length} related incident(s) (100% - shared root cause!)`);
+}
 
 export type GameAction =
   | { type: 'TICK'; dt: number; rng: SeededRNG }
@@ -127,35 +151,8 @@ function executeAction(
     return failedState;
   }
 
-  // CRITICAL: Deep clone state to prevent mutations!
-  // Maps are NOT cloned by spread operator!
-  const newState = {
-    ...state,
-    architecture: {
-      nodes: new Map(state.architecture.nodes),
-      edges: [...state.architecture.edges],
-    },
-    componentCounters: new Map(state.componentCounters),
-    actionCooldowns: new Map(state.actionCooldowns),
-    unlockedFeatures: new Set(state.unlockedFeatures),
-    recentIncidentTargets: [...state.recentIncidentTargets],
-    activeIncidents: state.activeIncidents.map(inc => ({ ...inc })),
-    actionsInProgress: state.actionsInProgress.map(act => ({ ...act })),
-    uptimeWindow: [...state.uptimeWindow],
-  };
-
-  // Deep clone nodes
-  newState.architecture.nodes = new Map(
-    Array.from(state.architecture.nodes.entries()).map(([id, node]) => [
-      id,
-      {
-        ...node,
-        scaling: { ...node.scaling },
-        specificMetrics: { ...node.specificMetrics },
-        features: { ...node.features },
-      },
-    ])
-  );
+  // O1: Use centralized deep-clone utility instead of inline copy-paste
+  const newState = cloneGameState(state);
 
   // Deduct cash AFTER cloning
   newState.cash -= actionDef.oneTimeCost; // For negative costs, this adds money
@@ -165,18 +162,14 @@ function executeAction(
   // Special handling for specific actions
   if (actionId === 'price_increase') {
     newState.pricing *= 1.1; // 10% price increase
-    import('../utils/terminalLog').then(({ tlog }) => {
-      tlog.success(`💰 Pricing increased to $${newState.pricing.toFixed(2)}/user/day`);
-    });
+    tlog.success(`💰 Pricing increased to $${newState.pricing.toFixed(2)}/user/day`);
   }
 
   if (actionId === 'marketing_campaign') {
     // Temporary user growth boost (handled in growth calculation)
     // Add a temporary flag or multiplier
     newState.reputation += 15;
-    import('../utils/terminalLog').then(({ tlog }) => {
-      tlog.success(`📣 Marketing campaign launched! User growth +50% for 2 minutes`);
-    });
+    tlog.success(`📣 Marketing campaign launched! User growth +50% for 2 minutes`);
   }
 
   // Apply effects
@@ -187,8 +180,7 @@ function executeAction(
     if (effects.statChanges) {
       const targetNode = actionDef.target === 'global' 
         ? null 
-        : state.architecture.nodes.get(actionDef.target);
-
+        : newState.architecture.nodes.get(actionDef.target);
       if (targetNode) {
         const changes = effects.statChanges;
         if (changes.capacity) {
@@ -197,9 +189,7 @@ function executeAction(
           const oldHealth = targetNode.health;
           targetNode.health = Math.min(1.0, targetNode.health + 0.1);
           if (targetNode.health > oldHealth) {
-            import('../utils/terminalLog').then(({ tlog }) => {
-              tlog.success(`💚 ${targetNode.name} health improved: ${(oldHealth * 100).toFixed(0)}% → ${(targetNode.health * 100).toFixed(0)}%`);
-            });
+            tlog.success(`💚 ${targetNode.name} health improved: ${(oldHealth * 100).toFixed(0)}% → ${(targetNode.health * 100).toFixed(0)}%`);
           }
         }
         if (changes.reliability) {
@@ -208,9 +198,7 @@ function executeAction(
           const oldHealth = targetNode.health;
           targetNode.health = Math.min(1.0, targetNode.health + 0.05);
           if (targetNode.health > oldHealth) {
-            import('../utils/terminalLog').then(({ tlog }) => {
-              tlog.success(`💚 ${targetNode.name} health improved: ${(oldHealth * 100).toFixed(0)}% → ${(targetNode.health * 100).toFixed(0)}%`);
-            });
+            tlog.success(`💚 ${targetNode.name} health improved: ${(oldHealth * 100).toFixed(0)}% → ${(targetNode.health * 100).toFixed(0)}%`);
           }
         }
         if (changes.security) targetNode.securityScore += changes.security;
@@ -220,14 +208,10 @@ function executeAction(
         // Auto-recover from degraded/down states if health improves enough
         if (targetNode.operationalMode === 'degraded' && targetNode.health >= 0.7) {
           targetNode.operationalMode = 'normal';
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`✅ ${targetNode.name} operational mode: degraded → normal`);
-          });
+          tlog.success(`✅ ${targetNode.name} operational mode: degraded → normal`);
         } else if (targetNode.operationalMode === 'down' && targetNode.health >= 0.5) {
           targetNode.operationalMode = 'degraded';
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`⚠️ ${targetNode.name} operational mode: down → degraded`);
-          });
+          tlog.success(`⚠️ ${targetNode.name} operational mode: down → degraded`);
         }
       }
     }
@@ -236,7 +220,7 @@ function executeAction(
     if (effects.featureToggle) {
       const targetNode = actionDef.target === 'global'
         ? null
-        : state.architecture.nodes.get(actionDef.target);
+        : newState.architecture.nodes.get(actionDef.target);
 
       if (targetNode) {
         targetNode.features = {
@@ -258,7 +242,7 @@ function executeAction(
 
     // Enable node
     if (effects.enableNode) {
-      const node = state.architecture.nodes.get(effects.enableNode);
+      const node = newState.architecture.nodes.get(effects.enableNode);
       if (node) {
         node.enabled = true;
         node.locked = false;
@@ -267,7 +251,7 @@ function executeAction(
 
     // Scale node
     if (effects.scaleNode) {
-      const node = state.architecture.nodes.get(effects.scaleNode.nodeId);
+      const node = newState.architecture.nodes.get(effects.scaleNode.nodeId);
       if (node) {
         const oldScaling = node.scaling.current;
         const newCurrent = node.scaling.current + effects.scaleNode.delta;
@@ -280,45 +264,32 @@ function executeAction(
         const oldHealth = node.health;
         node.health = Math.min(1.0, node.health + 0.15); // Recover 15% health per scale action
         if (node.health > oldHealth) {
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`💚 ${node.name} health recovered: ${(oldHealth * 100).toFixed(0)}% → ${(node.health * 100).toFixed(0)}%`);
-          });
+          tlog.success(`💚 ${node.name} health recovered: ${(oldHealth * 100).toFixed(0)}% → ${(node.health * 100).toFixed(0)}%`);
         }
         
         // Auto-recover from degraded/down states if health improves enough
         if (node.operationalMode === 'degraded' && node.health >= 0.7) {
           node.operationalMode = 'normal';
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`✅ ${node.name} operational mode: degraded → normal`);
-          });
+          tlog.success(`✅ ${node.name} operational mode: degraded → normal`);
         } else if (node.operationalMode === 'down' && node.health >= 0.5) {
           node.operationalMode = 'degraded';
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`⚠️ ${node.name} operational mode: down → degraded`);
-          });
+          tlog.success(`⚠️ ${node.name} operational mode: down → degraded`);
         }
         
-        // Log to terminal
-        import('../utils/terminalLog').then(({ tlog }) => {
-          tlog.system(`📊 ${node.name} scaled: ×${oldScaling} → ×${node.scaling.current}`);
-        });
+        tlog.system(`📊 ${node.name} scaled: ×${oldScaling} → ×${node.scaling.current}`);
         
         // Update component-specific metrics when scaling
         if (node.specificMetrics) {
           if ('instances' in node.specificMetrics) {
             const oldInstances = node.specificMetrics.instances;
             node.specificMetrics.instances = node.scaling.current;
-            import('../utils/terminalLog').then(({ tlog }) => {
-              tlog.info(`   instances: ${oldInstances} → ${node.specificMetrics.instances}`);
-            });
+            tlog.info(`   instances: ${oldInstances} → ${node.specificMetrics.instances}`);
           }
           // Scaling increases capacity, reduces queue backlog
           if ('queueBacklog' in node.specificMetrics && effects.scaleNode.delta > 0) {
             const oldBacklog = node.specificMetrics.queueBacklog;
             node.specificMetrics.queueBacklog = Math.max(0, node.specificMetrics.queueBacklog * 0.7);
-            import('../utils/terminalLog').then(({ tlog }) => {
-              tlog.info(`   queueBacklog: ${oldBacklog} → ${node.specificMetrics.queueBacklog} (-${Math.round((1 - 0.7) * 100)}%)`);
-            });
+            tlog.info(`   queueBacklog: ${oldBacklog} → ${node.specificMetrics.queueBacklog} (-${Math.round((1 - 0.7) * 100)}%)`);
           }
         }
       }
@@ -329,7 +300,7 @@ function executeAction(
       // Cause brief outage
       const targetNode = actionDef.target === 'global'
         ? null
-        : state.architecture.nodes.get(actionDef.target);
+        : newState.architecture.nodes.get(actionDef.target);
       if (targetNode) {
         targetNode.health = Math.max(0.3, targetNode.health - 0.5);
         targetNode.operationalMode = 'degraded';
@@ -378,11 +349,9 @@ function executeAction(
           });
         }
         
-        import('../utils/terminalLog').then(({ tlog }) => {
-          tlog.success(`✨ Added component: ${newNode.name} (${newNodeId})`);
-          tlog.info(`   Type: ${type} | Group: ${redundancyGroup || 'none'}`);
-          tlog.info(`   Cost: $${newNode.costPerSec.toFixed(3)}/sec`);
-        });
+        tlog.success(`✨ Added component: ${newNode.name} (${newNodeId})`);
+        tlog.info(`   Type: ${type} | Group: ${redundancyGroup || 'none'}`);
+        tlog.info(`   Cost: $${newNode.costPerSec.toFixed(3)}/sec`);
       }
     }
 
@@ -405,10 +374,8 @@ function executeAction(
         const counter = newState.componentCounters.get(baseType) || 1;
         newState.componentCounters.set(baseType, Math.max(0, counter - 1));
         
-        import('../utils/terminalLog').then(({ tlog }) => {
-          tlog.warn(`🗑️ Removed component: ${node.name} (${nodeId})`);
-          tlog.info(`   Saved: $${node.costPerSec.toFixed(3)}/sec`);
-        });
+        tlog.warn(`🗑️ Removed component: ${node.name} (${nodeId})`);
+        tlog.info(`   Saved: $${node.costPerSec.toFixed(3)}/sec`);
       }
     }
 
@@ -483,11 +450,9 @@ function executeAction(
           const counter = newState.componentCounters.get(baseType) || 0;
           newState.componentCounters.set(baseType, counter + 1);
           
-          import('../utils/terminalLog').then(({ tlog }) => {
-            tlog.success(`🚀 Split ${serviceName} Service from monolith`);
-            tlog.info(`   Handles ${trafficPercentage}% of app traffic`);
-            tlog.info(`   Microservices architecture enabled`);
-          });
+          tlog.success(`🚀 Split ${serviceName} Service from monolith`);
+          tlog.info(`   Handles ${trafficPercentage}% of app traffic`);
+          tlog.info(`   Microservices architecture enabled`);
         }
       }
     }
@@ -500,9 +465,7 @@ function executeAction(
   if (actionId === 'upgrade_observability_traces') {
     newState.observabilityLevel = 'TRACES';
   }
-  if (actionId === 'increase_price') {
-    newState.pricing *= 1.2;
-  }
+  // I1 FIX: Removed duplicate increase_price handler (price_increase at line 167 already handles 10%)
 
   // Dynamic remove operations - find and remove highest instance number
   if (actionId === 'remove_app_instance') {
@@ -519,9 +482,7 @@ function executeAction(
       const counter = newState.componentCounters.get('app') || 1;
       newState.componentCounters.set('app', Math.max(1, counter - 1));
       
-      import('../utils/terminalLog').then(({ tlog }) => {
-        tlog.warn(`🗑️ Removed ${toRemove.name} - saving $${toRemove.costPerSec.toFixed(3)}/sec`);
-      });
+      tlog.warn(`🗑️ Removed ${toRemove.name} - saving $${toRemove.costPerSec.toFixed(3)}/sec`);
     }
   }
 
@@ -539,9 +500,7 @@ function executeAction(
       const counter = newState.componentCounters.get('workers') || 1;
       newState.componentCounters.set('workers', Math.max(1, counter - 1));
       
-      import('../utils/terminalLog').then(({ tlog }) => {
-        tlog.warn(`🗑️ Removed ${toRemove.name} - saving $${toRemove.costPerSec.toFixed(3)}/sec`);
-      });
+      tlog.warn(`🗑️ Removed ${toRemove.name} - saving $${toRemove.costPerSec.toFixed(3)}/sec`);
     }
   }
 
@@ -549,9 +508,7 @@ function executeAction(
     const cacheNode = newState.architecture.nodes.get('cache');
     if (cacheNode) {
       cacheNode.enabled = false;
-      import('../utils/terminalLog').then(({ tlog }) => {
-        tlog.warn(`⚠️ Cache DISABLED - DB load will increase 3x!`);
-      });
+      tlog.warn(`⚠️ Cache DISABLED - DB load will increase 3x!`);
     }
   }
 
@@ -569,17 +526,8 @@ function executeAction(
         incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + immediateMitigation);
         incident.mitigationProgress = incident.mitigationLevel;
         
-        // Apply FULL mitigation to related incidents (shared root cause = same fix works for all)
-        if (incident.relatedIncidentIds && incident.relatedIncidentIds.length > 0) {
-          const sharedMitigation = immediateMitigation; // 100% mitigation for related incidents (same root cause!)
-          incident.relatedIncidentIds.forEach(relatedId => {
-            const relatedIncident = newState.activeIncidents.find(i => i.id === relatedId);
-            if (relatedIncident) {
-              relatedIncident.mitigationLevel = Math.min(1.0, relatedIncident.mitigationLevel + sharedMitigation);
-              relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
-            }
-          });
-        }
+        // O3: Use shared helper instead of inline duplicate
+        applyRelatedMitigation(newState.activeIncidents, incident, immediateMitigation);
       }
     }
     
@@ -604,17 +552,8 @@ function executeAction(
       incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + mitigationAmount);
       incident.mitigationProgress = incident.mitigationLevel;
       
-      // Apply FULL mitigation to related incidents (shared root cause = same fix works for all)
-      if (incident.relatedIncidentIds && incident.relatedIncidentIds.length > 0) {
-        const sharedMitigation = mitigationAmount; // 100% mitigation for related incidents (same root cause!)
-        incident.relatedIncidentIds.forEach(relatedId => {
-          const relatedIncident = newState.activeIncidents.find(i => i.id === relatedId);
-          if (relatedIncident) {
-            relatedIncident.mitigationLevel = Math.min(1.0, relatedIncident.mitigationLevel + sharedMitigation);
-            relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
-          }
-        });
-      }
+      // O3: Use shared helper instead of inline duplicate
+      applyRelatedMitigation(newState.activeIncidents, incident, mitigationAmount);
     }
   }
 
@@ -645,32 +584,29 @@ function executeAIAction(
   duration: number,
   mitigatingIncidentId: string
 ): GameState {
+  // Check cost first
+  if (state.cash < cost) return state;
+
+  // O1: Use centralized deep-clone utility
+  const newState = cloneGameState(state);
+
   // Apply immediate mitigation when AI action starts
   if (mitigatingIncidentId) {
-    const incident = state.activeIncidents.find(i => i.id === mitigatingIncidentId);
+    const incident = newState.activeIncidents.find(i => i.id === mitigatingIncidentId);
     if (incident) {
       const immediateMitigation = GAME_CONFIG.incidents.immediateMitigationOnActionStart;
       incident.mitigationLevel = Math.min(1.0, incident.mitigationLevel + immediateMitigation);
       incident.mitigationProgress = incident.mitigationLevel;
       
-      // Apply FULL mitigation to related incidents (shared root cause = same fix works for all)
-      if (incident.relatedIncidentIds && incident.relatedIncidentIds.length > 0) {
-        const sharedMitigation = immediateMitigation; // 100% mitigation for related incidents (same root cause!)
-        incident.relatedIncidentIds.forEach(relatedId => {
-          const relatedIncident = state.activeIncidents.find(i => i.id === relatedId);
-          if (relatedIncident) {
-            relatedIncident.mitigationLevel = Math.min(1.0, relatedIncident.mitigationLevel + sharedMitigation);
-            relatedIncident.mitigationProgress = relatedIncident.mitigationLevel;
-          }
-        });
-      }
+      // O3: Use shared helper instead of inline duplicate
+      applyRelatedMitigation(newState.activeIncidents, incident, immediateMitigation);
       
-      // Apply metric improvements from AI action immediately (partial)
+      // O5: metricImprovements is now typed on the action interface
       const action = incident.aiSuggestedActions?.find(a => a.actionName === actionName);
-      if (action && (action as any).metricImprovements) {
-        const targetNode = state.architecture.nodes.get(incident.targetNodeId);
+      if (action?.metricImprovements) {
+        const targetNode = newState.architecture.nodes.get(incident.targetNodeId);
         if (targetNode && targetNode.specificMetrics) {
-          const improvements = (action as any).metricImprovements;
+          const improvements = action.metricImprovements;
           for (const [metricKey, improvement] of Object.entries(improvements)) {
             if (metricKey in targetNode.specificMetrics && typeof improvement === 'number') {
               const currentValue = targetNode.specificMetrics[metricKey];
@@ -686,13 +622,9 @@ function executeAIAction(
     }
   }
 
-  // Check cost
-  if (state.cash < cost) return state;
-
   // Play sound when action starts
   soundNotifications.playActionStart();
 
-  const newState = { ...state };
   newState.cash -= cost;
 
   // Add to actions in progress
@@ -714,9 +646,9 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
   // Generate truly unique ID using timestamp + random
   const uniqueId = `ai_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   
-  // Check if similar incident already exists (same AI ID from GPT)
+  // O5: aiIncidentName is typed on ActiveIncident
   const exists = state.activeIncidents.some(i => 
-    i.aiGenerated && (i as any).aiIncidentName === aiIncident.incidentName
+    i.aiGenerated && i.aiIncidentName === aiIncident.incidentName
   );
   
   if (exists) {
@@ -759,17 +691,27 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
     rootCauseShared: relatedIncidents.length > 0,
   };
   
-  // Link related incidents bidirectionally
+  // M5 FIX: Link related incidents bidirectionally on cloned incident array
+  // We must not mutate the old state's incidents
   if (relatedIncidents.length > 0) {
-    relatedIncidents.forEach(relatedIncident => {
-      if (!relatedIncident.relatedIncidentIds) {
-        relatedIncident.relatedIncidentIds = [];
+    // spawnAIIncident returns a new state with cloned incidents, so we build it here
+    const clonedIncidents = state.activeIncidents.map(inc => {
+      const isRelated = relatedIncidents.some(r => r.id === inc.id);
+      if (isRelated) {
+        return {
+          ...inc,
+          relatedIncidentIds: [...(inc.relatedIncidentIds || []), uniqueId],
+          rootCauseShared: true,
+        };
       }
-      if (!relatedIncident.relatedIncidentIds.includes(uniqueId)) {
-        relatedIncident.relatedIncidentIds.push(uniqueId);
-      }
-      relatedIncident.rootCauseShared = true;
+      return { ...inc };
     });
+    
+    return {
+      ...state,
+      activeIncidents: [...clonedIncidents, newIncident],
+      totalIncidents: state.totalIncidents + 1,
+    };
   }
   
   // Play sound based on severity

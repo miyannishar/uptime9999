@@ -1,5 +1,8 @@
 /* UPTIME 99.99 - Dark Theme with Neon Accents */
 
+/* CSS-3 FIX: Import monospace font for consistent rendering */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
   --bg-primary: #0a0a0f;
   --bg-secondary: #1a1a2e;
@@ -33,6 +36,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;
+  overflow-y: auto; /* CSS-5 FIX: Allow vertical scrolling on short viewports */
 }
 
 .mono {
@@ -85,7 +89,8 @@ body {
   gap: 0.8rem;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto; /* SP-3 FIX: Scroll instead of silently clipping metrics */
+  scrollbar-width: none; /* Hide scrollbar but allow scroll */
 }
 
 .hud-metric {
@@ -97,7 +102,7 @@ body {
 }
 
 .hud-label {
-  font-size: 0.65rem;
+  font-size: 0.7rem; /* SP-1 FIX: Minimum readable size (was 0.65rem) */
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -110,6 +115,7 @@ body {
   font-weight: 600;
   color: var(--accent-cyan);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums; /* ENH-2: Prevent layout jitter on numeric changes */
 }
 
 .hud-value.good {
@@ -802,8 +808,6 @@ body {
   font-size: 0.85rem;
   color: var(--accent-cyan);
   font-weight: 600;
-  color: var(--accent-cyan);
-  font-weight: 600;
 }
 
 .stat-value.status-normal {
@@ -1005,7 +1009,7 @@ body {
 
 /* === ACTIVITY LOG === */
 .activity-log {
-  width: 320px;
+  width: clamp(250px, 20vw, 360px); /* SP-5 FIX: Responsive width instead of fixed 320px */
   background: var(--bg-secondary);
   border-top: 2px solid var(--accent-cyan);
   border-left: 2px solid var(--border);
@@ -1210,21 +1214,7 @@ body {
   gap: 1rem;
 }
 
-.modal-button {
-  padding: 0.6rem 1.5rem;
-  background: var(--accent-cyan);
-  color: var(--bg-primary);
-  border: none;
-  border-radius: 4px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.modal-button:hover {
-  background: var(--accent-blue);
-  box-shadow: 0 0 12px var(--accent-cyan);
-}
+/* CSS-2 FIX: Removed duplicate .modal-button block — consolidated into single rule below */
 
 /* === MODALS === */
 .modal-overlay {
@@ -1568,5 +1558,45 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-cyan);
+}
+
+/* ENH-3: Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg-primary);
+}
+
+/* === VIEW LOGS BUTTON (CSS-4 FIX) === */
+.view-logs-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-blue);
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.view-logs-button:hover {
+  background: rgba(0, 170, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* === ENH-4: Focus Styles for Keyboard Accessibility === */
+button:focus-visible,
+.action-button:focus-visible,
+.quick-action:focus-visible,
+.tab-button:focus-visible,
+.hud-button:focus-visible,
+.speed-button:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
 }
 

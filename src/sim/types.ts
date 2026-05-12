@@ -8,7 +8,8 @@ export type ComponentType =
 export type IncidentSeverity = 'INFO' | 'WARN' | 'CRIT';
 export type IncidentCategory = 
   | 'TRAFFIC' | 'SECURITY' | 'DEPLOY' | 'DNS' | 'COMPUTE' 
-  | 'DATABASE' | 'QUEUE' | 'EXTERNAL' | 'OBSERVABILITY' | 'OPTIMIZATION';
+  | 'DATABASE' | 'QUEUE' | 'EXTERNAL' | 'OBSERVABILITY' | 'OPTIMIZATION'
+  | 'CACHE' | 'WORKERS' | 'STORAGE' | 'CDN';
 
 export type ObservabilityLevel = 'BASIC' | 'METRICS' | 'TRACES';
 
@@ -44,6 +45,9 @@ export interface ComponentNode {
   
   // Costs
   costPerSec: number;
+  
+  // Temporary state (used by engine for capacity restoration)
+  _originalCapacity?: number;
   
   // State
   operationalMode: 'normal' | 'degraded' | 'down';
@@ -207,6 +211,7 @@ export interface ActiveIncident {
     cost: number;
     durationSeconds: number;
     effectiveness: number;
+    metricImprovements?: Record<string, number | boolean>; // O5: AI-generated metric targets
   }>;
   aiEffects?: any; // AI-generated effects
   aiCategory?: string; // AI-generated category (e.g., "OPTIMIZATION")
@@ -232,10 +237,13 @@ export interface GameState {
   hourOfDay: number;
   paused: boolean;
   speed: number; // 1, 2, 4
+  autoPaused: boolean; // True when auto-paused by tab visibility
   
   // AI Game Master (always active)
   aiSessionActive: boolean;
   recentIncidentTargets: Array<{ nodeId: string; timestamp: number }>; // Track recently targeted nodes
+  lastCalmPeriodEnd: number; // Timestamp when breather period ends (after CRIT resolve)
+  tokenUsage: { totalCalls: number; estimatedTokens: number; estimatedCostUSD: number };
   
   // Architecture
   architecture: Architecture;
@@ -285,6 +293,9 @@ export interface GameState {
   // Game state
   gameOver: boolean;
   gameOverReason?: string;
+  
+  // Internal timers
+  reputationZeroTimer: number;
   
   // Run stats
   totalProfit: number;
