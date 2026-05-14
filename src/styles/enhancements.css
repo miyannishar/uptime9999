@@ -496,6 +496,9 @@
   border-radius: 8px;
   padding: 8px;
   margin: 6px 0;
+  max-height: 120px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 .timeline-header {
   display: flex;
@@ -769,4 +772,13 @@
 .modal-button.secondary:hover {
   background: rgba(60, 70, 90, 0.9);
   color: #a0b0c0;
+}
+
+/* === Progressive Architecture: Deploying Animation === */
+.deploying-node {
+  animation: deployPulse 1.5s ease-in-out infinite;
+}
+@keyframes deployPulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.4; }
 }

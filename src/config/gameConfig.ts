@@ -3,8 +3,8 @@
 export const GAME_CONFIG = {
   // === STARTING STATE ===
   starting: {
-    users: 10000,
-    cash: 15000, // Increased from 8000: compensates for steeper uptime-revenue curve
+    users: 200,      // Bootstrap: start small, grow by deploying components
+    cash: 5000,      // Enough for 1-2 early component deployments
     pricing: 25, // $ per user per day
     reputation: 80,
     techDebt: 0,

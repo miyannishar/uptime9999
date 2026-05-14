@@ -196,10 +196,18 @@ function App() {
       const realDt = (now - lastTick) / 1000;
       lastTick = now;
 
-      const dt = realDt; // Removed speed multiplier - always runs at real-time
+      const dt = realDt * latestState.speed; // Apply speed multiplier (1x/2x/4x)
 
       // Tick simulation on the LATEST state (includes any user action changes)
       const newState = tickSimulation(latestState, rngRef.current, dt);
+
+      // Check deployment timers
+      newState.deployingComponents.forEach((info, componentId) => {
+        const elapsed = (now - info.startTime) / 1000;
+        if (elapsed >= info.durationSec) {
+          dispatch({ type: 'DEPLOYMENT_COMPLETE', componentId });
+        }
+      });
       
       // Update state FIRST (before async AI operations)
       dispatch({ type: 'LOAD_GAME', state: newState });
@@ -221,7 +229,7 @@ function App() {
         const randomFactor = rngRef.current.nextFloat(0.6, 1.4); // ±40% variance
         const randomInterval = (baseMin + rngRef.current.next() * (baseMax - baseMin)) * randomFactor;
         const stressMultiplier = Math.min(0.4, newState.activeIncidents.length * 0.15);
-        const nextIncidentTime = randomInterval * (1 - stressMultiplier);
+        const nextIncidentTime = (randomInterval * (1 - stressMultiplier)) / latestState.speed;
         
         // Silent - only log when spawning
         
@@ -527,6 +535,7 @@ function App() {
         state={state}
         onTogglePause={handleTogglePause}
         onNewGame={handleNewGame}
+        onSetSpeed={(speed) => dispatch({ type: 'SET_SPEED', speed })}
       />
 
       {/* Status Page Widget — sits below HUD */}
@@ -557,6 +566,13 @@ function App() {
             activeIncidents={state.activeIncidents}
             onSelectNode={setSelectedNode}
             selectedNodeId={selectedNode}
+            deployedComponents={state.deployedComponents}
+            deployingComponents={state.deployingComponents}
+            users={state.users}
+            elapsedSec={(Date.now() - state.startTime) / 1000}
+            totalIncidents={state.totalIncidents}
+            cash={state.cash}
+            onDeployComponent={(id) => dispatch({ type: 'DEPLOY_COMPONENT', componentId: id })}
           />
         </div>
 

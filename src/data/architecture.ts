@@ -645,3 +645,98 @@ export function createInitialArchitecture(): {
   return { nodes, edges };
 }
 
+/**
+ * Create a minimal architecture for the bootstrap phase.
+ * Only DNS + APP + DB_PRIMARY with a direct load path.
+ */
+export function createMinimalArchitecture(): {
+  nodes: Map<string, ComponentNode>;
+  edges: ArchitectureEdge[];
+} {
+  // Get the full architecture as a blueprint library
+  const full = createInitialArchitecture();
+  const nodes = new Map<string, ComponentNode>();
+
+  // Only include starting components
+  const startingIds = ['dns', 'app', 'db_primary'];
+  for (const id of startingIds) {
+    const node = full.nodes.get(id);
+    if (node) {
+      nodes.set(id, node);
+    }
+  }
+
+  // Minimal edges: DNS → APP → DB
+  const edges: ArchitectureEdge[] = [
+    { from: 'dns', to: 'app', weight: 1.0 },
+    { from: 'app', to: 'db_primary', weight: 0.8 },
+  ];
+
+  return { nodes, edges };
+}
+
+/**
+ * Deploy a new component into the architecture.
+ * Pulls the node definition from the full blueprint library and adds the specified edges.
+ * Returns true if deployment was successful.
+ */
+export function deployComponent(
+  architecture: { nodes: Map<string, ComponentNode>; edges: ArchitectureEdge[] },
+  componentId: string,
+  newEdges: Array<{ from: string; to: string; weight: number }>,
+): boolean {
+  // Don't deploy if already exists
+  if (architecture.nodes.has(componentId)) return false;
+
+  // Get the node definition from the full architecture
+  const full = createInitialArchitecture();
+  const nodeTemplate = full.nodes.get(componentId);
+  if (!nodeTemplate) return false;
+
+  // Add the node
+  architecture.nodes.set(componentId, { ...nodeTemplate, enabled: true, locked: false });
+
+  // Handle edge rewiring for specific components
+  if (componentId === 'cdn') {
+    // When CDN is deployed, DNS should route through CDN instead of directly to APP
+    // Remove DNS→APP direct edge
+    architecture.edges = architecture.edges.filter(
+      e => !(e.from === 'dns' && e.to === 'app')
+    );
+  }
+  
+  if (componentId === 'waf') {
+    // When WAF is deployed, CDN should route through WAF instead of directly to APP
+    architecture.edges = architecture.edges.filter(
+      e => !(e.from === 'cdn' && e.to === 'app')
+    );
+  }
+
+  if (componentId === 'rlb') {
+    // When RLB is deployed, remove direct connections to APP from upstream LBs
+    // The edges from RLB→APP will be added by the blueprint
+  }
+
+  if (componentId === 'apigw') {
+    // When API Gateway is deployed, RLB→APP becomes RLB→APIGW→APP
+    architecture.edges = architecture.edges.filter(
+      e => !(e.from === 'rlb' && e.to === 'app')
+    );
+  }
+
+  // Add the new edges
+  for (const edge of newEdges) {
+    // Only add if both nodes exist
+    if (architecture.nodes.has(edge.from) && architecture.nodes.has(edge.to)) {
+      // Avoid duplicate edges
+      const exists = architecture.edges.some(
+        e => e.from === edge.from && e.to === edge.to
+      );
+      if (!exists) {
+        architecture.edges.push(edge);
+      }
+    }
+  }
+
+  return true;
+}

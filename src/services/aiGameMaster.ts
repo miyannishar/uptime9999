@@ -315,17 +315,22 @@ Analyze the effectiveness of this action and respond with a JSON object containi
 
 Goal: Generate creative, specific incidents based on component metrics and dynamic architecture.
 
+PROGRESSIVE ARCHITECTURE:
+- The player STARTS with a minimal infrastructure (DNS + APP + DB) and ADDS components over time
+- You will receive the list of currently deployed nodes in each request
+- ONLY target nodes that currently exist — never generate incidents for components the player hasn't deployed
+- In early game (few components), incidents should be SIMPLER: DB connection issues, app memory leaks, DNS misconfigurations
+- As the player deploys more components, incidents become MORE COMPLEX: cascading failures, inter-service issues, cache-DB consistency problems
+- When a new component is just deployed, consider generating a "teething problem" incident for it (configuration drift, cold cache, etc.)
+
 DYNAMIC ARCHITECTURE AWARENESS:
-- System now has MULTIPLE INSTANCES of components (app, app_2, workers, worker_2, db_replica, db_replica_2, etc.)
+- System can have MULTIPLE INSTANCES of components (app, app_2, workers, worker_2, db_replica, db_replica_2, etc.)
 - Components are grouped by redundancyGroup (e.g., 'app_cluster', 'worker_pool', 'db_replicas')
 - Player can ADD/REMOVE instances dynamically via Quick Actions
 - Incidents should target SPECIFIC INSTANCES when relevant (e.g., "worker_2 is overloaded" not just "workers")
 - If a redundancy group has multiple healthy instances, system can survive one instance failure
-- Consider instance count when generating incidents (more instances = more resilient but more complex)
 
-Components: dns, cdn, waf, glb, rlb, apigw, app, cache, workers, db_primary, db_replica, queue, object_storage, observability, service_mesh
-+ Dynamic instances: app_2, worker_2, db_replica_2, cache_2, etc.
-+ Split services: auth, payment, notification, search (if player created them)
+Components vary per game state — check the Nodes list in each request.
 Metrics examples: hitRate, queueBacklog, connections, cpu, instances, instanceNumber, redundancyGroup
 
 Requirements:

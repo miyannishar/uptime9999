@@ -301,6 +301,16 @@ export interface GameState {
   totalProfit: number;
   totalIncidents: number;
 
+  // === PROGRESSIVE ARCHITECTURE ===
+  deployedComponents: Set<string>;
+  deployingComponents: Map<string, { startTime: number; durationSec: number }>;
+  componentDeploymentHistory: Array<{
+    componentId: string;
+    deployedAt: number;
+    cost: number;
+  }>;
+  lastScalingHintComponent: string | null; // Prevent duplicate hints
+
   // === ENHANCEMENT FEATURES ===
   
   // Status Page

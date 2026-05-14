@@ -1,14 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Architecture, ActiveIncident } from '../sim/types';
+import { COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
 
 interface ArchMapProps {
   architecture: Architecture;
   activeIncidents: ActiveIncident[];
   onSelectNode: (id: string) => void;
   selectedNodeId: string | null;
+  // Progressive architecture
+  deployedComponents: Set<string>;
+  deployingComponents: Map<string, { startTime: number; durationSec: number }>;
+  users: number;
+  elapsedSec: number;
+  totalIncidents: number;
+  cash: number;
+  onDeployComponent?: (componentId: string) => void;
 }
 
-export default function ArchMap({ architecture, activeIncidents, onSelectNode, selectedNodeId }: ArchMapProps) {
+export default function ArchMap({ architecture, activeIncidents, onSelectNode, selectedNodeId, deployedComponents, deployingComponents, users, elapsedSec, totalIncidents, cash, onDeployComponent }: ArchMapProps) {
   const { nodes, edges } = architecture;
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -659,6 +668,74 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                   ⚠️
                 </text>
               )}
+            </g>
+          );
+        })}
+
+        {/* === GHOST SLOTS: Undeployed Components === */}
+        {COMPONENT_BLUEPRINTS.map(bp => {
+          if (deployedComponents.has(bp.id)) return null;
+          const pos = basePositions[bp.id];
+          if (!pos) return null;
+
+          const isDeploying = deployingComponents.has(bp.id);
+          const deployInfo = deployingComponents.get(bp.id);
+          const meetsPrereqs = bp.prerequisites.every(req => deployedComponents.has(req));
+          const meetsConds = (!bp.unlockConditions.minUsers || users >= bp.unlockConditions.minUsers) &&
+            (!bp.unlockConditions.minElapsedSec || elapsedSec >= bp.unlockConditions.minElapsedSec) &&
+            (!bp.unlockConditions.minIncidents || totalIncidents >= bp.unlockConditions.minIncidents);
+          const isAvailable = meetsPrereqs && meetsConds && !isDeploying;
+          const canAfford = cash >= bp.deployCost;
+
+          // Deploying: animated progress
+          if (isDeploying && deployInfo) {
+            const elapsed = (Date.now() - deployInfo.startTime) / 1000;
+            const progress = Math.min(1, elapsed / deployInfo.durationSec);
+            return (
+              <g key={`ghost-${bp.id}`}>
+                <rect x={pos.x} y={pos.y} width="300" height="200" fill="#0a0a1a" stroke="#00ffaa" strokeWidth="3" rx="10" strokeDasharray="0" opacity="0.9" className="deploying-node" />
+                <text x={pos.x + 150} y={pos.y + 50} textAnchor="middle" fill="#00ffaa" fontSize="24" fontWeight="bold">{bp.icon} {bp.name}</text>
+                <text x={pos.x + 150} y={pos.y + 80} textAnchor="middle" fill="#888" fontSize="16">Deploying...</text>
+                {/* Progress bar bg */}
+                <rect x={pos.x + 30} y={pos.y + 100} width="240" height="16" fill="#222" rx="8" />
+                {/* Progress bar fill */}
+                <rect x={pos.x + 30} y={pos.y + 100} width={240 * progress} height="16" fill="#00ffaa" rx="8" />
+                <text x={pos.x + 150} y={pos.y + 140} textAnchor="middle" fill="#00ffaa" fontSize="18" fontWeight="600">{Math.round(progress * 100)}%</text>
+              </g>
+            );
+          }
+
+          // Available: dashed border with deploy button
+          if (isAvailable) {
+            return (
+              <g key={`ghost-${bp.id}`} onClick={() => canAfford && onDeployComponent?.(bp.id)} style={{ cursor: canAfford ? 'pointer' : 'not-allowed' }}>
+                <rect x={pos.x} y={pos.y} width="300" height="200" fill="#0a0a1a" stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="10" strokeDasharray="10,6" opacity="0.6" />
+                <text x={pos.x + 150} y={pos.y + 55} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#555'} fontSize="36">
+                  {bp.icon}
+                </text>
+                <text x={pos.x + 150} y={pos.y + 90} textAnchor="middle" fill={canAfford ? '#ccc' : '#555'} fontSize="20" fontWeight="bold">{bp.name}</text>
+                <text x={pos.x + 150} y={pos.y + 120} textAnchor="middle" fill="#888" fontSize="14">{bp.description.slice(0, 45)}...</text>
+                {/* Deploy button */}
+                <rect x={pos.x + 75} y={pos.y + 140} width="150" height="36" fill={canAfford ? '#00ffaa22' : '#33333366'} stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="8" />
+                <text x={pos.x + 150} y={pos.y + 163} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#666'} fontSize="16" fontWeight="bold">
+                  {canAfford ? `Deploy $${bp.deployCost}` : `Need $${bp.deployCost}`}
+                </text>
+              </g>
+            );
+          }
+
+          // Locked: dim outline with requirements
+          const currentPhase = users < 500 ? 1 : users < 2000 ? 2 : users < 10000 ? 3 : 4;
+          if (bp.phase > currentPhase + 1) return null; // Don't show far-future components
+
+          return (
+            <g key={`ghost-${bp.id}`} opacity="0.3">
+              <rect x={pos.x} y={pos.y} width="300" height="200" fill="transparent" stroke="#333" strokeWidth="1" rx="10" strokeDasharray="12,8" />
+              <text x={pos.x + 150} y={pos.y + 70} textAnchor="middle" fill="#444" fontSize="32">🔒</text>
+              <text x={pos.x + 150} y={pos.y + 105} textAnchor="middle" fill="#444" fontSize="16">{bp.name}</text>
+              <text x={pos.x + 150} y={pos.y + 130} textAnchor="middle" fill="#333" fontSize="13">
+                {!meetsPrereqs ? `Requires: ${bp.prerequisites.filter(r => !deployedComponents.has(r)).join(', ')}` : bp.unlockConditions.minUsers ? `${bp.unlockConditions.minUsers}+ users` : 'Locked'}
+              </text>
             </g>
           );
         })}

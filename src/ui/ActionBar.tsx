@@ -93,6 +93,9 @@ export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
           const action = ACTIONS.find(a => a.id === actionId);
           if (!action) return null;
 
+          // Hide actions for components not yet deployed
+          if (action.target && !state.deployedComponents.has(action.target)) return null;
+
           const canExecute = canExecuteAction(actionId);
           const cooldown = getCooldownRemaining(actionId);
           const inProgress = state.actionsInProgress.some(a => a.actionId === actionId);

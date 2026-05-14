@@ -14,7 +14,8 @@ import {
   computeAlertFatigueGrowth,
 } from './formulas';
 import { INCIDENTS } from '../data/incidents';
-import { createInitialArchitecture } from '../data/architecture';
+import { createMinimalArchitecture } from '../data/architecture';
+import { STARTING_COMPONENTS } from '../config/progressionConfig';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric, clampAllMetrics } from './clampMetrics';
 import { cloneGameState } from '../utils/stateUtils';
@@ -23,7 +24,7 @@ import { soundNotifications } from '../utils/soundNotifications';
 import { applyRelatedMitigation } from './reducer';
 
 export function createInitialState(seed: string): GameState {
-  const architecture = createInitialArchitecture();
+  const architecture = createMinimalArchitecture();
   const startTime = Date.now();
 
   // Initialize component counters based on initial architecture
@@ -81,6 +82,12 @@ export function createInitialState(seed: string): GameState {
     actionCooldowns: new Map(),
 
     unlockedFeatures: new Set(),
+
+    // Progressive architecture
+    deployedComponents: new Set(STARTING_COMPONENTS),
+    deployingComponents: new Map(),
+    componentDeploymentHistory: [],
+    lastScalingHintComponent: null,
 
     fundingRound: 'bootstrap',
     investorPressure: 0,
@@ -638,11 +645,21 @@ function updateUptime(state: GameState, dt: number) {
   const redundancyGroups = buildRedundancyGroupMap(nodes);
   
   // Check critical component groups (with redundancy support)
-  const criticalGroups = [
-    { group: 'dns_cluster', fallback: ['dns'] },
+  // Dynamic critical groups — only check components that are deployed
+  const criticalGroups: Array<{ group: string; fallback: string[] }> = [
     { group: 'app_cluster', fallback: ['app'] },
-    { group: 'db_replicas', fallback: ['db_primary', 'db_replica'] },
   ];
+  
+  // Only check DNS if deployed
+  if (nodes.has('dns')) {
+    criticalGroups.push({ group: 'dns_cluster', fallback: ['dns'] });
+  }
+  // Only check DB replicas if primary is deployed
+  if (nodes.has('db_primary')) {
+    const dbFallback = ['db_primary'];
+    if (nodes.has('db_replica')) dbFallback.push('db_replica');
+    criticalGroups.push({ group: 'db_replicas', fallback: dbFallback });
+  }
   
   let criticalNodesHealth = 1.0;
   

@@ -169,6 +169,34 @@ body {
   align-items: center;
 }
 
+.speed-controls {
+  display: flex;
+  gap: 2px;
+  background: rgba(10, 15, 25, 0.8);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+.speed-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: #6b7b8d;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.speed-btn:hover {
+  color: #c8d6e5;
+  background: rgba(100, 180, 255, 0.1);
+}
+.speed-btn.active {
+  color: #00ffaa;
+  background: rgba(0, 255, 170, 0.15);
+}
+
 .hud-button {
   padding: 0.4rem 0.7rem;
   background: var(--bg-tertiary);

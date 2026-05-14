@@ -5,12 +5,14 @@ interface HudBarProps {
   state: GameState;
   onTogglePause: () => void;
   onNewGame: () => void;
+  onSetSpeed: (speed: number) => void;
 }
 
 export default function HudBar({
   state,
   onTogglePause,
   onNewGame,
+  onSetSpeed,
 }: HudBarProps) {
   const formatNumber = (num: number): string => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -114,6 +116,18 @@ export default function HudBar({
         <button onClick={onTogglePause} className="hud-button">
           {state.paused ? '▶ Play' : '⏸ Pause'}
         </button>
+
+        <div className="speed-controls">
+          {[1, 2, 4].map(s => (
+            <button
+              key={s}
+              onClick={() => onSetSpeed(s)}
+              className={`speed-btn ${state.speed === s ? 'active' : ''}`}
+            >
+              {s}x
+            </button>
+          ))}
+        </div>
 
         <button onClick={onNewGame} className="hud-button">🔄 New Run</button>
 

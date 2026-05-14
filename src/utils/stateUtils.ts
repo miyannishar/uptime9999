@@ -37,6 +37,12 @@ export function cloneGameState(state: GameState): GameState {
     postMortemQueue: state.postMortemQueue.map(p => ({ ...p })),
     statusPageHistory: [...state.statusPageHistory],
     incidentHistory: state.incidentHistory.map(h => ({ ...h })),
+    // Progressive architecture
+    deployedComponents: new Set(state.deployedComponents),
+    deployingComponents: new Map(
+      Array.from(state.deployingComponents.entries()).map(([k, v]) => [k, { ...v }])
+    ),
+    componentDeploymentHistory: state.componentDeploymentHistory.map(d => ({ ...d })),
   };
 }
 
