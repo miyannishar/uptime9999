@@ -530,6 +530,34 @@ function applyIncidentEffects(state: GameState, dt: number) {
       }
     }
 
+    // Spread: a long-running unmitigated incident can pull in a neighbouring type
+    if (incidentDef.spreadsTo?.length && incident.mitigationLevel < 0.5) {
+      const age = (Date.now() - incident.startTime) / 1000;
+      if (age > GAME_CONFIG.incidents.spreadAfterSeconds) {
+        const already = new Set(state.activeIncidents.map(i => i.targetNodeId));
+        const victim = Array.from(state.architecture.nodes.values()).find(
+          n => n.enabled && incidentDef.spreadsTo!.includes(n.type) && !already.has(n.id)
+        );
+        if (victim && state.activeIncidents.length < GAME_CONFIG.incidents.maxConcurrent) {
+          state.activeIncidents.push({
+            id: `spread_${incident.id}_${victim.id}`,
+            definitionId: incident.definitionId,
+            targetNodeId: victim.id,
+            severity: incident.severity,
+            startTime: Date.now(),
+            escalationTimer: 0,
+            outagetimer: incidentDef.timeToOutageSeconds ?? 0,
+            mitigationLevel: 0,
+            mitigationProgress: 0,
+            relatedIncidentIds: [incident.id],
+            rootCauseShared: true,
+          });
+          state.totalIncidents++;
+          tlog.warn(`⚠️ ${incidentDef.name} spread to ${victim.name}`);
+        }
+      }
+    }
+
     // Outage timer
     if (incidentDef.timeToOutageSeconds && incident.outagetimer > 0) {
       incident.outagetimer -= dt;

@@ -77,6 +77,7 @@ export const GAME_CONFIG = {
     },
     // Immediate mitigation when action starts (gives player hope)
     immediateMitigationOnActionStart: 0.3, // 30% mitigation applied immediately when action starts
+    spreadAfterSeconds: 45,
   },
 
   // === AI / OPENAI ===

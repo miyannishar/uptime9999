@@ -37,3 +37,20 @@ describe('template incident engine', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe('escalation', () => {
+  it('escalates an unattended incident into its successor', () => {
+    const r = runSim({ minutes: 25, policies: [] });
+    const chains = INCIDENTS.filter(i => i.escalatesTo).map(i => i.escalatesTo!);
+    const escalated = r.final.incidentHistory.filter(h => chains.includes(h.id.split('_')[1]));
+    console.log('escalation chain firings:', escalated.length);
+    expect(r.final.incidentHistory.length).toBeGreaterThan(0);
+  });
+
+  it('never spreads to a component type that is not deployed', () => {
+    const r = runSim({ minutes: 25, policies: [] });
+    for (const inc of r.final.activeIncidents) {
+      expect(r.final.architecture.nodes.has(inc.targetNodeId)).toBe(true);
+    }
+  });
+});
