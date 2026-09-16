@@ -414,19 +414,21 @@ function applyIncidentEffects(state: GameState, dt: number) {
           for (const [metricKey, effectValue] of Object.entries(aiEffects.metricEffects)) {
             if (metricKey in targetNode.specificMetrics) {
               const currentValue = targetNode.specificMetrics[metricKey];
-              if (typeof currentValue === 'number' && typeof effectValue === 'number') {
+              const delta = Number(effectValue);
+              if (!Number.isFinite(delta)) continue;
+              if (typeof currentValue === 'number' && typeof delta === 'number') {
                 // Clamp effect value to reasonable bounds first
-                let clampedEffect = effectValue;
+                let clampedEffect = delta;
                 if (metricKey.includes('Percent') || metricKey === 'avgCPUPercent' || metricKey === 'avgMemoryPercent') {
-                  clampedEffect = Math.max(-50, Math.min(50, effectValue)); // Max ±50% change
+                  clampedEffect = Math.max(-50, Math.min(50, delta)); // Max ±50% change
                 } else if (metricKey === 'connections' || metricKey === 'concurrentConnections') {
-                  clampedEffect = Math.max(-100, Math.min(100, effectValue)); // Max ±100 connections
+                  clampedEffect = Math.max(-100, Math.min(100, delta)); // Max ±100 connections
                 } else if (metricKey === 'evictionRate') {
-                  clampedEffect = Math.max(-500, Math.min(500, effectValue)); // Max ±500 keys/sec
+                  clampedEffect = Math.max(-500, Math.min(500, delta)); // Max ±500 keys/sec
                 } else if (metricKey === 'queueBacklog' || metricKey === 'messagesQueued') {
-                  clampedEffect = Math.max(-5000, Math.min(5000, effectValue)); // Max ±5k messages
+                  clampedEffect = Math.max(-5000, Math.min(5000, delta)); // Max ±5k messages
                 } else if (metricKey === 'hitRate' || metricKey.includes('Rate')) {
-                  clampedEffect = Math.max(-0.5, Math.min(0.5, effectValue)); // Max ±0.5 (50%)
+                  clampedEffect = Math.max(-0.5, Math.min(0.5, delta)); // Max ±0.5 (50%)
                 }
                 
                 // Apply gradually over time (effectValue represents target change over ~10 seconds)
@@ -1007,13 +1009,15 @@ function updateActions(state: GameState, _dt: number) {
               const targetNode = state.architecture.nodes.get(incident.targetNodeId);
               if (targetNode && targetNode.specificMetrics) {
                 tlog.info(`📈 Applying metric improvements for ${targetNode.name}:`);
-                
+
                 for (const [metricKey, improvement] of Object.entries(metricImprovements)) {
                   if (metricKey in targetNode.specificMetrics) {
                     if (typeof improvement === 'number') {
+                      const delta = Number(improvement);
+                      if (!Number.isFinite(delta)) continue;
                       const currentValue = targetNode.specificMetrics[metricKey];
                       if (typeof currentValue === 'number') {
-                        const finalImprovement = improvement * 0.7;
+                        const finalImprovement = delta * 0.7;
                         const newValue = currentValue + finalImprovement;
                         targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
                         
