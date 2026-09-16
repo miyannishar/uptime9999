@@ -724,8 +724,19 @@ export function deployComponent(
   }
 
   if (componentId === 'rlb') {
-    // When RLB is deployed, remove direct connections to APP from upstream LBs
-    // The edges from RLB→APP will be added by the blueprint
+    // Insert RLB between the furthest-downstream edge node and APP.
+    const upstream = ['waf', 'cdn', 'dns'].find(id => architecture.nodes.has(id));
+    if (upstream) {
+      architecture.edges = architecture.edges.filter(e => !(e.from === upstream && e.to === 'app'));
+      architecture.edges.push({ from: upstream, to: 'rlb', weight: 1.0 });
+    }
+  }
+
+  if (componentId === 'glb') {
+    // GLB sits between WAF and RLB: WAF→GLB→RLB, so drop any direct WAF bypass.
+    architecture.edges = architecture.edges.filter(
+      e => !(e.from === 'waf' && (e.to === 'app' || e.to === 'rlb'))
+    );
   }
 
   if (componentId === 'apigw') {
