@@ -4,6 +4,8 @@ import { gameReducer } from './sim/reducer';
 import { SeededRNG, generateSeed } from './sim/rng';
 import { initializeAIGameMaster, getAIGameMaster, resetAIGameMaster } from './services/aiGameMaster';
 import { resetTaskApiTracking } from './services/taskGenerator';
+import { shouldFlavour, flavourIncident } from './services/incidentFlavour';
+import { INCIDENTS } from './data/incidents';
 
 import HudBar from './ui/HudBar';
 import IncidentFeed from './ui/IncidentFeed';
@@ -11,8 +13,7 @@ import ArchMap from './ui/ArchMap';
 import DetailPanel from './ui/DetailPanel';
 import ActionBar from './ui/ActionBar';
 import ActivityLog from './ui/ActivityLog';
-import LoadingScreen from './ui/LoadingScreen';
-import { tlog, isDebug } from './utils/terminalLog';
+import { tlog } from './utils/terminalLog';
 import GameOverModal from './ui/GameOverModal';
 import { useResizable } from './hooks/useResizable';
 import { useGameSubsystems } from './hooks/useGameSubsystems';
@@ -40,7 +41,7 @@ function App() {
   
   const rngRef = useRef(new SeededRNG(seed));
   const stateRef = useRef(state);
-  const aiLastIncidentRef = useRef(0);
+  const flavouredIdsRef = useRef(new Set<string>());
   
   // Resizable panels (horizontal) - using config defaults
   const leftPanel = useResizable(
@@ -99,13 +100,13 @@ function App() {
   const hasInitializedRef = useRef(false);
   
   useEffect(() => {
-    // Only initialize once, and only if not already active
-    if (hasInitializedRef.current || state.aiSessionActive) {
+    // Only initialize once
+    if (hasInitializedRef.current) {
       return;
     }
-    
+
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    
+
     if (apiKey && apiKey.startsWith('sk-')) {
       // Check if instance already exists and has started
       const existingGameMaster = getAIGameMaster();
@@ -115,70 +116,56 @@ function App() {
         hasInitializedRef.current = true;
         return;
       }
-      
+
       // Create new instance only if needed
       const gameMaster = initializeAIGameMaster(apiKey);
       hasInitializedRef.current = true;
-      
+
       gameMaster.startSession(state).then(() => {
         dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: true });
       }).catch(err => {
         hasInitializedRef.current = false; // Reset on error so it can retry
-        alert(`Failed to initialize AI Game Master: ${err.message}\n\nThe game requires OpenAI API key to run.\n\nSteps:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\nCheck also:\n- API key is valid\n- You have OpenAI API credits\n- Network connection works`);
+        tlog.warn(`⚠️ AI Game Master failed to start: ${err.message} — running without AI prose.`);
       });
     } else {
-      // Security: Never show the actual API key value in alerts
-      alert(`⚠️ OpenAI API Key Required!\n\nThis game uses AI to generate dynamic incidents.\n\nSetup:\n1. Create .env file in project root\n2. Add: VITE_OPENAI_API_KEY=sk-your-key\n3. RESTART dev server (npm run dev)\n\n⚠️ SECURITY WARNING: This is a client-side app. API keys are bundled into the JavaScript.\nFor production, use a backend proxy to protect your API key.`);
+      // No API key — game runs fine without one; AI prose is disabled.
+      tlog.warn('ℹ️ VITE_OPENAI_API_KEY not set — game running without AI incident flavour. Add it to .env to enable.');
     }
   }, []); // Only run once on mount
 
-  // C4.2 FIX: Auto-PAUSE on tab hide instead of killing the session
-  // Resume when tab becomes visible again
+  // Auto-PAUSE on tab hide, resume when visible again
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && stateRef.current.aiSessionActive && !stateRef.current.paused) {
-        // Auto-pause when tab is hidden (don't kill session)
+      if (document.hidden && !stateRef.current.paused) {
+        // Auto-pause when tab is hidden
         dispatch({ type: 'PATCH', fn: () => ({ autoPaused: true, paused: true }) });
       } else if (!document.hidden && stateRef.current.autoPaused) {
         dispatch({ type: 'PATCH', fn: () => ({ autoPaused: false, paused: false }) });
       }
     };
 
-    const handleBeforeUnload = () => {
-      if (stateRef.current.aiSessionActive) {
-        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
-      }
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
-  // Game loop - only run when AI is active and not paused
+  // Game loop - runs whenever not paused or game over (no API key required)
   useEffect(() => {
-    if (!state.aiSessionActive || state.paused || state.gameOver) return;
-    
-    let lastTick = Date.now();
+    if (state.paused || state.gameOver) return;
 
-    const interval = setInterval(async () => {
-      // ALWAYS use stateRef.current to get the absolute latest state (includes user actions)
+    let lastTick = Date.now();
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
+
+    const interval = setInterval(() => {
+      // Always use stateRef.current to capture the latest user actions
       const latestState = stateRef.current;
-      
-      // Stop immediately if game over, paused, or AI session inactive
-      if (latestState.paused || latestState.gameOver || !latestState.aiSessionActive) {
-        // If game is over, stop AI session to prevent further requests
-        if (latestState.gameOver && latestState.aiSessionActive) {
-          dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
-        }
+
+      if (latestState.paused || latestState.gameOver) {
         return;
       }
 
-      // Stop if tab is hidden (additional safety check)
       if (document.hidden) {
         return;
       }
@@ -187,110 +174,48 @@ function App() {
       const realDt = (now - lastTick) / 1000;
       lastTick = now;
 
-      const dt = realDt * latestState.speed; // Apply speed multiplier (1x/2x/4x)
+      const dt = realDt * latestState.speed;
 
-      // Tick simulation on the LATEST state (includes any user action changes)
+      // Snapshot incident IDs before tick so we can detect new spawns
+      const prevIds = new Set(latestState.activeIncidents.map(i => i.id));
+
       const newState = tickSimulation(latestState, rngRef.current, dt);
-
-      // Update state FIRST (before async AI operations)
       dispatch({ type: 'LOAD_GAME', state: newState });
-      
-      // AI Game Master: Generate contextual incidents based on system metrics
-      if (newState.aiSessionActive) {
-        // Initialize timer on first run
-        if (aiLastIncidentRef.current === 0) {
-          aiLastIncidentRef.current = now;
-        }
-        
-        const timeSinceLastAI = now - aiLastIncidentRef.current;
-        const elapsed = (now - newState.startTime) / 1000;
-        
-        // Highly variable timing - feels organic, not periodic
-        // Use RNG for deterministic but varied intervals
-        const baseMin = Math.max(8000, 15000 - elapsed * 4); // 15s → 8s
-        const baseMax = Math.max(25000, 45000 - elapsed * 8); // 45s → 25s
-        const randomFactor = rngRef.current.nextFloat(0.6, 1.4); // ±40% variance
-        const randomInterval = (baseMin + rngRef.current.next() * (baseMax - baseMin)) * randomFactor;
-        const stressMultiplier = Math.min(0.4, newState.activeIncidents.length * 0.15);
-        const nextIncidentTime = (randomInterval * (1 - stressMultiplier)) / latestState.speed;
-        
-        // Silent - only log when spawning
-        
-        if (timeSinceLastAI > nextIncidentTime) {
-          // Double-check paused state before making API call
-          const currentState = stateRef.current;
-          if (currentState.paused || currentState.gameOver || !currentState.aiSessionActive || document.hidden) {
-            return;
-          }
-          
-          aiLastIncidentRef.current = now; // Reset timer IMMEDIATELY to prevent spam
-          
-          const gameMaster = getAIGameMaster();
-          if (gameMaster && gameMaster.shouldMakeApiCall()) {
-            // Don't await - let it run async
-            gameMaster.generateIncident(newState).then(aiIncident => {
-              // Check state again before processing result
-              const finalState = stateRef.current;
-              if (finalState.paused || finalState.gameOver || !finalState.aiSessionActive) {
-                return;
-              }
-          if (aiIncident) {
-            // Log incident to terminal (npm run dev terminal)
-            tlog.error('');
-            tlog.error('═══════════════════════════════════════════════');
-            tlog.error(`🚨 NEW INCIDENT: ${aiIncident.incidentName}`);
-            tlog.warn(`   Severity: ${aiIncident.severity} | Target: ${aiIncident.targetNodeId}`);
-            tlog.info(`   ${aiIncident.description}`);
-            if (aiIncident.effects?.metricEffects) {
-              tlog.info('   Metric Effects:');
-              for (const [key, val] of Object.entries(aiIncident.effects.metricEffects)) {
-                tlog.info(`     ${key}: ${typeof val === 'number' && val > 0 ? '+' : ''}${val}`);
-              }
-            }
-            tlog.error('═══════════════════════════════════════════════');
-            
-            // Log current component state after incident
-            const targetNode = newState.architecture.nodes.get(aiIncident.targetNodeId);
-            if (targetNode && isDebug()) {
-              tlog.debug('');
-              tlog.debug(`📊 ${targetNode.name} State After Incident:`);
-              tlog.debug(`   Health: ${(targetNode.health * 100).toFixed(1)}%`);
-              tlog.debug(`   Utilization: ${(targetNode.utilization * 100).toFixed(1)}%`);
-              tlog.debug(`   Error Rate: ${(targetNode.errorRate * 100).toFixed(2)}%`);
-              tlog.debug(`   Latency: ${targetNode.latency.toFixed(0)}ms`);
-              if (targetNode.specificMetrics) {
-                tlog.debug('   Specific Metrics:');
-                for (const [key, val] of Object.entries(targetNode.specificMetrics)) {
-                  tlog.debug(`     ${key}: ${JSON.stringify(val)}`);
-                }
-              }
-              tlog.debug('');
-            }
-            
-            // Track this target to encourage diversity
-            dispatch({ type: 'TRACK_INCIDENT_TARGET', nodeId: aiIncident.targetNodeId });
-            dispatch({ type: 'SPAWN_AI_INCIDENT', incident: aiIncident });
-          } else {
-            tlog.warn('⚠️ AI returned null - no incident generated');
-          }
-            }).catch(err => {
-              tlog.error(`❌ Incident generation failed: ${err instanceof Error ? err.message : String(err)}`);
-            }).finally(() => {
-              dispatch({ type: 'PATCH', fn: () => ({ tokenUsage: gameMaster.getUsage() }) });
+
+      // Flavour newly spawned incidents with AI prose (async, never blocks the tick)
+      if (apiKey) {
+        const newIncidents = newState.activeIncidents.filter(i => !prevIds.has(i.id));
+        for (const incident of newIncidents) {
+          if (flavouredIdsRef.current.has(incident.id)) continue;
+          if (!shouldFlavour(incident.severity, apiKey)) continue;
+
+          flavouredIdsRef.current.add(incident.id);
+          const def = INCIDENTS.find(d => d.id === incident.definitionId);
+          const node = newState.architecture.nodes.get(incident.targetNodeId);
+          if (!def || !node) continue;
+
+          const id = incident.id;
+          flavourIncident(def, node, apiKey).then(r => {
+            if (!r) return;
+            dispatch({
+              type: 'PATCH',
+              fn: s => ({
+                activeIncidents: s.activeIncidents.map(i =>
+                  i.id === id
+                    ? { ...i, aiIncidentName: r.name, aiDescription: r.description, aiLogs: r.logs }
+                    : i
+                ),
+              }),
             });
-          }
+          });
         }
       }
     }, 100); // 100ms tick
 
     return () => {
       clearInterval(interval);
-      // Additional safety: stop AI session when component unmounts or AI session becomes inactive
-      if (stateRef.current.aiSessionActive) {
-        dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
-      }
     };
-  }, [state.aiSessionActive, state.paused, state.gameOver]); // Re-run when AI active, paused, or game over changes
+  }, [state.paused, state.gameOver]);
 
   // Stop AI session when game is over
   useEffect(() => {
@@ -322,6 +247,7 @@ function App() {
     resetTaskApiTracking(); // otherwise a new run inherits the previous run's exhausted task budget
     dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
     hasInitializedRef.current = false;
+    flavouredIdsRef.current = new Set();
     resetSubsystems();
   };
 
@@ -341,11 +267,6 @@ function App() {
   const handleExecuteAIAction = (actionName: string, cost: number, duration: number, incidentId: string) => {
     dispatch({ type: 'EXECUTE_AI_ACTION', actionName, cost, duration, mitigatingIncidentId: incidentId });
   };
-
-  // Show loading screen while AI is initializing
-  if (!state.aiSessionActive) {
-    return <LoadingScreen />;
-  }
 
   return (
     <div className={`app ${state.warRoomActive ? 'war-room' : ''}`}>

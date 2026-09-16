@@ -90,6 +90,8 @@ export const GAME_CONFIG = {
     // 1500 truncated the "log" task type (50-100 log lines) mid-JSON; 4000 is only a
     // ceiling, billing follows actual usage (incidents ~1000, log tasks ~1900)
     maxCompletionTokens: 4000,
+    // Only flavour WARN/CRIT to keep AI spend reasonable (INFO is too noisy).
+    flavourSeverities: ['WARN', 'CRIT'] as ReadonlyArray<'INFO' | 'WARN' | 'CRIT'>,
   },
 
   // === SESSION MANAGEMENT ===
