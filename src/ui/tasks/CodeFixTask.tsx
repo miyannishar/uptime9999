@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useElapsedSeconds } from '../../hooks/useElapsedSeconds';
 
 interface CodeFixTaskProps {
   filename: string;
@@ -23,15 +24,8 @@ export default function CodeFixTask({
   const [error, setError] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [attempts, setAttempts] = useState(0);
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const secondsElapsed = useElapsedSeconds();
 
-  // Timer for skip button
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSubmit = () => {
     if (validateFix(editedCode)) {

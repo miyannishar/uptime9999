@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 **This file is authoritative over `README.md`.** The README is a design document that has drifted from the code (it still lists deleted modules, "70+ actions", GPT-4, autosave, and a milestone-unlock system that was never implemented). Where they disagree, trust this file and the code.
 

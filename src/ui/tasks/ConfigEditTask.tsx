@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useElapsedSeconds } from '../../hooks/useElapsedSeconds';
 
 interface ConfigEditTaskProps {
   filename: string;
@@ -19,15 +20,8 @@ export default function ConfigEditTask({
 }: ConfigEditTaskProps) {
   const [editedContent, setEditedContent] = useState(content);
   const [error, setError] = useState('');
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const secondsElapsed = useElapsedSeconds();
 
-  // Timer for skip button
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSubmit = () => {
     // More flexible validation - check for the target value in various formats

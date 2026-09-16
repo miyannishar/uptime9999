@@ -15,7 +15,6 @@ export interface ComponentBlueprint {
     minUsers?: number;
     minElapsedSec?: number;
     minIncidents?: number;
-    minReputation?: number;
   };
   edges: Array<{ from: string; to: string; weight: number }>;
   stakeholderHint?: {
@@ -29,11 +28,6 @@ export interface ComponentBlueprint {
 // Components that exist from the start
 export const STARTING_COMPONENTS = ['dns', 'app', 'db_primary'];
 
-// Starting edges (DNS → APP → DB)
-export const STARTING_EDGES = [
-  { from: 'dns', to: 'app', weight: 1.0 },
-  { from: 'app', to: 'db_primary', weight: 0.8 },
-];
 
 export const COMPONENT_BLUEPRINTS: ComponentBlueprint[] = [
   // ═══════════════════════════════════════
@@ -279,46 +273,24 @@ export const COMPONENT_BLUEPRINTS: ComponentBlueprint[] = [
   },
 ];
 
-/**
- * Get blueprints that are unlockable given current game state
- */
-export function getAvailableBlueprints(
-  deployedComponents: Set<string>,
+
+
+/** Per-blueprint gating. Single source of truth — ArchMap and the subsystem loop both use it. */
+export function blueprintStatus(
+  bp: ComponentBlueprint,
+  deployed: Set<string>,
   users: number,
   elapsedSec: number,
   totalIncidents: number,
-): ComponentBlueprint[] {
-  return COMPONENT_BLUEPRINTS.filter(bp => {
-    // Already deployed
-    if (deployedComponents.has(bp.id)) return false;
-    
-    // Check prerequisites
-    if (bp.prerequisites.some(req => !deployedComponents.has(req))) return false;
-    
-    // Check unlock conditions
-    const cond = bp.unlockConditions;
-    if (cond.minUsers && users < cond.minUsers) return false;
-    if (cond.minElapsedSec && elapsedSec < cond.minElapsedSec) return false;
-    if (cond.minIncidents && totalIncidents < cond.minIncidents) return false;
-    
-    return true;
-  });
-}
-
-/**
- * Get blueprints that are visible but locked (show requirements)
- */
-export function getLockedBlueprints(
-  deployedComponents: Set<string>,
-  users: number,
-): ComponentBlueprint[] {
-  return COMPONENT_BLUEPRINTS.filter(bp => {
-    if (deployedComponents.has(bp.id)) return false;
-    
-    // Show locked if in current or next phase
-    const currentPhase = users < 500 ? 1 : users < 2000 ? 2 : users < 10000 ? 3 : 4;
-    return bp.phase <= currentPhase + 1;
-  });
+) {
+  const c = bp.unlockConditions;
+  const meetsPrereqs = bp.prerequisites.every(req => deployed.has(req));
+  const unlocked = meetsPrereqs
+    && (!c.minUsers || users >= c.minUsers)
+    && (!c.minElapsedSec || elapsedSec >= c.minElapsedSec)
+    && (!c.minIncidents || totalIncidents >= c.minIncidents);
+  const phase = users < 500 ? 1 : users < 2000 ? 2 : users < 10000 ? 3 : 4;
+  return { meetsPrereqs, unlocked, visible: bp.phase <= phase + 1 };
 }
 
 /**

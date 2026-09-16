@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Architecture, ActiveIncident } from '../sim/types';
-import { COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
+import { COMPONENT_BLUEPRINTS, blueprintStatus } from '../config/progressionConfig';
 
 interface ArchMapProps {
   architecture: Architecture;
@@ -680,11 +680,8 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
 
           const isDeploying = deployingComponents.has(bp.id);
           const deployInfo = deployingComponents.get(bp.id);
-          const meetsPrereqs = bp.prerequisites.every(req => deployedComponents.has(req));
-          const meetsConds = (!bp.unlockConditions.minUsers || users >= bp.unlockConditions.minUsers) &&
-            (!bp.unlockConditions.minElapsedSec || elapsedSec >= bp.unlockConditions.minElapsedSec) &&
-            (!bp.unlockConditions.minIncidents || totalIncidents >= bp.unlockConditions.minIncidents);
-          const isAvailable = meetsPrereqs && meetsConds && !isDeploying;
+          const { meetsPrereqs, unlocked, visible } = blueprintStatus(bp, deployedComponents, users, elapsedSec, totalIncidents);
+          const isAvailable = unlocked && !isDeploying;
           const canAfford = cash >= bp.deployCost;
 
           // Deploying: animated progress
@@ -724,9 +721,8 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
             );
           }
 
-          // Locked: dim outline with requirements
-          const currentPhase = users < 500 ? 1 : users < 2000 ? 2 : users < 10000 ? 3 : 4;
-          if (bp.phase > currentPhase + 1) return null; // Don't show far-future components
+          // Locked: dim outline with requirements. Far-future components stay hidden.
+          if (!visible) return null;
 
           return (
             <g key={`ghost-${bp.id}`} opacity="0.3">

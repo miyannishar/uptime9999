@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useElapsedSeconds } from '../../hooks/useElapsedSeconds';
 
 interface TerminalCommandTaskProps {
   prompt: string;
@@ -18,15 +19,8 @@ export default function TerminalCommandTask({
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const secondsElapsed = useElapsedSeconds();
 
-  // Timer for skip button
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -36,24 +36,12 @@ export interface AIIncidentResponse {
   autoResolveSeconds?: number;
 }
 
-export interface AIMetricsUpdate {
-  healthChanges: Record<string, number>; // nodeId -> health delta
-  metricsAdjustments: {
-    errorRate?: number;
-    latency?: number;
-    utilization?: number;
-  };
-  reputationDelta: number;
-  nextIncidentHint?: string;
-}
-
 export type ConversationMessage = ChatMessage;
 
 class AIGameMaster {
   private apiKey: string;
   private conversationHistory: ConversationMessage[] = [];
   private sessionStarted: boolean = false;
-  private incidentCount: number = 0;
   
   // C4 FIX: Session management
   private sessionStartTime: number = 0;
@@ -89,13 +77,12 @@ class AIGameMaster {
     return true;
   }
 
-  // Token usage tracking
-  getTokenUsage() {
+
+  getUsage() {
     return {
       totalCalls: this.totalApiCalls,
       estimatedTokens: this.estimatedTokensUsed,
       estimatedCostUSD: this.estimatedCostUSD,
-      sessionDurationMs: this.sessionStartTime > 0 ? Date.now() - this.sessionStartTime : 0,
     };
   }
 
@@ -227,48 +214,6 @@ class AIGameMaster {
     }
   }
 
-  async reportUserAction(
-    actionName: string,
-    targetNode: string,
-    incidentId: string | null,
-    currentState: GameState
-  ): Promise<AIMetricsUpdate | null> {
-    if (!this.sessionStarted) return null;
-
-    const prompt = `User executed action: "${actionName}" targeting ${targetNode}${
-      incidentId ? ` to mitigate incident ${incidentId}` : ''
-    }. Current system state: ${this.serializeGameState(currentState)}. 
-
-Analyze the effectiveness of this action and respond with a JSON object containing:
-{
-  "healthChanges": { "nodeId": deltaValue },
-  "metricsAdjustments": { "errorRate": delta, "latency": delta, "utilization": delta },
-  "reputationDelta": number,
-  "nextIncidentHint": "brief hint about what might happen next"
-}`;
-
-    // Reset conversation history - only keep system message
-    this.conversationHistory = [
-      this.conversationHistory[0], // Keep only system message
-    ];
-
-    this.conversationHistory.push({
-      role: 'user',
-      content: prompt,
-    });
-
-    try {
-      const response = await this.callOpenAI();
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response,
-      });
-
-      return this.parseMetricsUpdate(response);
-    } catch (error) {
-      return null;
-    }
-  }
 
   private buildSystemPrompt(_initialState: GameState): string {
     return `AI Game Master for "UPTIME 99.99" - DevOps simulation.
@@ -537,27 +482,13 @@ Respond JSON only.`;
     return parsed;
   }
 
-  private parseMetricsUpdate(response: string): AIMetricsUpdate | null {
-    return parseJSON<AIMetricsUpdate>(response);
-  }
 
-  getConversationHistory(): ConversationMessage[] {
-    return [...this.conversationHistory];
-  }
 
-  getConversationSummary(): string {
-    return `Session started: ${this.sessionStarted}\nIncidents generated: ${this.incidentCount}\nMessages: ${this.conversationHistory.length}`;
-  }
 
   isSessionActive(): boolean {
     return this.sessionStarted;
   }
 
-  // C4.5 FIX: logUserAction is dead code — history gets reset to system prompt before each call.
-  // Removed the push to conversationHistory. Keeping method signature for backward compat.
-  logUserAction(_actionName: string, _targetNode: string, _context: string = ''): void {
-    // No-op: conversation history is reset before each API call anyway
-  }
 }
 
 // Singleton instance

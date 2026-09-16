@@ -154,20 +154,6 @@ export function getRarityColor(rarity: string): string {
   return RARITY_COLORS[rarity] || '#9ca3af';
 }
 
-/**
- * Load achievements from localStorage
- */
-export function loadPersistedAchievements(): Set<string> {
-  try {
-    const saved = localStorage.getItem('uptime9999_achievements');
-    if (saved) {
-      return new Set(JSON.parse(saved));
-    }
-  } catch {
-    // localStorage might not be available
-  }
-  return new Set();
-}
 
 /**
  * Save achievements to localStorage

@@ -48,6 +48,9 @@ export type GameAction =
   | { type: 'SPAWN_AI_INCIDENT'; incident: any }
   | { type: 'NEW_GAME'; seed: string }
   | { type: 'LOAD_GAME'; state: GameState }
+  // Partial update. Takes an updater, not a literal, so batched dispatches in one tick
+  // each merge against fresh state instead of clobbering each other (see PATCH case).
+  | { type: 'PATCH'; fn: (s: GameState) => Partial<GameState> }
   | { type: 'DEBUG_SPAWN_INCIDENT'; incidentId: string; targetNodeId: string }
   // Enhancement features
   | { type: 'UPDATE_STATUS_PAGE'; level: GameState['statusPageLevel']; message: string }
@@ -141,6 +144,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'LOAD_GAME':
       return action.state;
+
+    case 'PATCH':
+      return { ...state, ...action.fn(state) };
 
     case 'DEBUG_SPAWN_INCIDENT':
       return debugSpawnIncident(state, action.incidentId, action.targetNodeId);

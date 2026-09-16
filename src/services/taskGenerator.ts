@@ -3,8 +3,8 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import { tlog } from '../utils/terminalLog';
 import { chatJSON, parseJSON, errMsg } from './openai';
 
-// A6 FIX: Shared API call tracking with aiGameMaster
-// Prevents task generation from bypassing session limits
+// Task calls are counted separately from aiGameMaster's, but against the same
+// GAME_CONFIG.session budget, capped at the share below.
 let taskApiCallCount = 0;
 let taskSessionStart = 0;
 
@@ -13,16 +13,11 @@ export function resetTaskApiTracking() {
   taskSessionStart = 0;
 }
 
-export function getTaskApiCallCount() {
-  return taskApiCallCount;
-}
-
 function shouldAllowTaskApiCall(): boolean {
   const cfg = GAME_CONFIG.session;
   const now = Date.now();
   
-  // Cap task-specific calls at 25% of total budget
-  if (taskApiCallCount >= Math.floor(cfg.maxApiCalls * 0.25)) {
+  if (taskApiCallCount >= Math.floor(cfg.maxApiCalls * cfg.taskCallShare)) {
     return false;
   }
   
@@ -210,7 +205,6 @@ Target Node: ${targetNode}
 Generate ONE appropriate interactive task. Respond with JSON only.`;
 
   try {
-    // A6 FIX: Check session limits before making API call
     if (!shouldAllowTaskApiCall()) {
       tlog.warn('⚠️ Task generation skipped: API call budget exhausted');
       return null;

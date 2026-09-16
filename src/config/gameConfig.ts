@@ -57,22 +57,6 @@ export const GAME_CONFIG = {
 
   // === INCIDENT SYSTEM ===
   incidents: {
-    baseDifficultyMultiplier: 1.0,
-    maxDifficultyMultiplier: 2.5, // BAL-8: Increased from 1.5 for meaningful late-game challenge
-    difficultyTimeScale: 1800, // BAL-8: 30 minutes to max difficulty (was 3600)
-    difficultyUserThresholds: {
-      high: { users: 200000, multiplier: 1.2 },
-      medium: { users: 100000, multiplier: 1.1 },
-    },
-    hazardMultipliers: {
-      maxHazardCap: 3.0, // prevent death spiral
-      utilizationThreshold: 0.9,
-      utilizationFactor: 1.5,
-      errorThreshold: 0.1,
-      errorFactor: 2.0,
-      techDebtFactor: 0.5, // per 100 debt
-      securityFactor: 0.5,
-    },
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
     // AI Incident effect caps (prevent death spiral)
     aiEffectCaps: {
@@ -101,8 +85,27 @@ export const GAME_CONFIG = {
   session: {
     maxDurationMs: 30 * 60 * 1000, // 30 minute hard cap
     maxApiCalls: 200, // Max OpenAI calls per session
+    taskCallShare: 0.25, // fraction of maxApiCalls that interactive tasks may consume
     inactivityTimeoutMs: 5 * 60 * 1000, // 5 min idle → auto-end
     calmPeriodAfterCritMs: 30000, // 30 second breather after resolving CRIT
+  },
+
+  // === SUBSYSTEMS (pager, war room, stakeholders, status page) ===
+  subsystems: {
+    tickMs: 500,
+    messageTtlMs: 30000,
+    maxPendingMessages: 3,
+    ignoredMessagePenalty: 2, // reputation per message left to expire
+    pagerTimeoutMs: 30000,
+    pagerMissedRepPenalty: 5,
+    pagerMissedBurnout: 5,
+    warRoomCritThreshold: 3,
+    warRoomSurvivedRepBonus: 5,
+    statusPageUnderstatedPenalty: 0.05, // reputation per tick while understating an outage
+    statusPageGraceSec: 30,
+    postMortemEveryNResolved: 3,
+    postMortemUserImpactShare: 0.3,
+    postMortemRevenueLostShare: 0.5,
   },
 
   // === METRIC RECOVERY ===
@@ -136,7 +139,6 @@ export const GAME_CONFIG = {
     tickIntervalMs: 100, // real time between ticks
     defaultSimDt: 1, // simulated seconds per tick
     uptimeWindowSize: 300, // 5 minutes
-    autosaveIntervalSec: 30,
   },
 
   // === ACTIVITY RATE (time of day) ===
@@ -199,18 +201,4 @@ export const GAME_CONFIG = {
   },
 };
 
-// Helper to get action timing preset
-export function getActionTiming(speed: 'fast' | 'medium' | 'slow' | 'verySlow') {
-  const timings = GAME_CONFIG.actions;
-  switch (speed) {
-    case 'fast':
-      return { duration: timings.fastDuration, cooldown: timings.fastCooldown };
-    case 'medium':
-      return { duration: timings.mediumDuration, cooldown: timings.mediumCooldown };
-    case 'slow':
-      return { duration: timings.slowDuration, cooldown: timings.slowCooldown };
-    case 'verySlow':
-      return { duration: timings.verySlowDuration, cooldown: timings.verySlowCooldown };
-  }
-}
 

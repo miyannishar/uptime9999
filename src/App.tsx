@@ -3,7 +3,7 @@ import { createInitialState, tickSimulation } from './sim/engine';
 import { gameReducer } from './sim/reducer';
 import { SeededRNG, generateSeed } from './sim/rng';
 import { initializeAIGameMaster, getAIGameMaster, resetAIGameMaster } from './services/aiGameMaster';
-import { ACTIONS } from './data/actions';
+import { resetTaskApiTracking } from './services/taskGenerator';
 
 import HudBar from './ui/HudBar';
 import IncidentFeed from './ui/IncidentFeed';
@@ -15,6 +15,7 @@ import LoadingScreen from './ui/LoadingScreen';
 import { tlog, isDebug } from './utils/terminalLog';
 import GameOverModal from './ui/GameOverModal';
 import { useResizable } from './hooks/useResizable';
+import { useGameSubsystems } from './hooks/useGameSubsystems';
 import { GAME_CONFIG } from './config/gameConfig';
 
 // Enhancement feature imports
@@ -24,8 +25,6 @@ import PostMortem from './ui/PostMortem';
 import PagerAlert from './ui/PagerAlert';
 import IncidentTimeline from './ui/IncidentTimeline';
 import AchievementToast from './ui/AchievementToast';
-import { STAKEHOLDERS, StakeholderMetrics } from './data/stakeholders';
-import { ACHIEVEMENTS, AchievementMetrics, persistAchievements } from './data/achievements';
 
 import './styles/theme.css';
 import './styles/tasks.css';
@@ -42,11 +41,6 @@ function App() {
   const rngRef = useRef(new SeededRNG(seed));
   const stateRef = useRef(state);
   const aiLastIncidentRef = useRef(0);
-  
-  // Enhancement feature refs
-  const stakeholderCooldowns = useRef<Map<string, number>>(new Map());
-  const lowestReputationRef = useRef(100);
-  const lastIncidentCountRef = useRef(0);
   
   // Resizable panels (horizontal) - using config defaults
   const leftPanel = useResizable(
@@ -144,12 +138,9 @@ function App() {
     const handleVisibilityChange = () => {
       if (document.hidden && stateRef.current.aiSessionActive && !stateRef.current.paused) {
         // Auto-pause when tab is hidden (don't kill session)
-        dispatch({ type: 'TOGGLE_PAUSE' });
-        // Mark as auto-paused so we can auto-resume
-        dispatch({ type: 'LOAD_GAME', state: { ...stateRef.current, autoPaused: true, paused: true } });
+        dispatch({ type: 'PATCH', fn: () => ({ autoPaused: true, paused: true }) });
       } else if (!document.hidden && stateRef.current.autoPaused) {
-        // Auto-resume when tab becomes visible again
-        dispatch({ type: 'LOAD_GAME', state: { ...stateRef.current, autoPaused: false, paused: false } });
+        dispatch({ type: 'PATCH', fn: () => ({ autoPaused: false, paused: false }) });
       }
     };
 
@@ -292,6 +283,8 @@ function App() {
           }
             }).catch(err => {
               tlog.error(`❌ Incident generation failed: ${err instanceof Error ? err.message : String(err)}`);
+            }).finally(() => {
+              dispatch({ type: 'PATCH', fn: () => ({ tokenUsage: gameMaster.getUsage() }) });
             });
           }
         }
@@ -321,152 +314,7 @@ function App() {
     }
   }, [state.gameOver, showGameOver]);
 
-  // === Enhancement Features Logic ===
-  useEffect(() => {
-    if (!state.aiSessionActive || state.paused || state.gameOver) return;
-
-    const interval = setInterval(() => {
-      const s = stateRef.current;
-      if (s.paused || s.gameOver) return;
-      const now = Date.now();
-      const elapsed = (now - s.startTime) / 1000;
-
-      // Track lowest reputation for Phoenix achievement
-      if (s.reputation < lowestReputationRef.current) {
-        lowestReputationRef.current = s.reputation;
-      }
-
-      // --- Stakeholder Message Triggers ---
-      const critCount = s.activeIncidents.filter(i => i.severity === 'CRIT').length;
-      const warnCount = s.activeIncidents.filter(i => i.severity === 'WARN').length;
-      const metrics: StakeholderMetrics = {
-        reputation: s.reputation, uptime: s.uptime, cash: s.cash,
-        revenue: s.revenue, costs: s.costs, critCount, warnCount,
-        totalIncidents: s.totalIncidents, techDebt: s.techDebt,
-        burnout: s.burnout, users: s.users,
-        warRoomActive: s.warRoomActive, elapsedSeconds: elapsed,
-      };
-
-      STAKEHOLDERS.forEach(stakeholder => {
-        const lastSent = stakeholderCooldowns.current.get(stakeholder.id) || 0;
-        if (now - lastSent < stakeholder.cooldownMs) return;
-        if (s.stakeholderMessages.filter(m => !m.selectedResponse).length >= 3) return;
-        if (stakeholder.triggerCondition(metrics)) {
-          const { message, responses } = stakeholder.generateMessage(metrics);
-          stakeholderCooldowns.current.set(stakeholder.id, now);
-          dispatch({ type: 'LOAD_GAME', state: {
-            ...stateRef.current,
-            stakeholderMessages: [...stateRef.current.stakeholderMessages, {
-              id: `sh_${now}_${stakeholder.id}`, character: stakeholder.character,
-              icon: stakeholder.icon, message, responses, timestamp: now, expiresAt: now + 30000,
-            }],
-          }});
-        }
-      });
-
-      // --- Pager Trigger ---
-      if (!s.pagerActive && critCount > 0) {
-        const newestCrit = s.activeIncidents.filter(i => i.severity === 'CRIT')
-          .sort((a, b) => b.startTime - a.startTime)[0];
-        if (newestCrit) {
-          dispatch({ type: 'LOAD_GAME', state: {
-            ...stateRef.current, pagerActive: true, pagerIncidentId: newestCrit.id,
-            pagerAcknowledged: false, pagerStartTime: now,
-          }});
-        }
-      }
-      if (s.pagerActive && !s.pagerAcknowledged && (now - s.pagerStartTime) > 30000) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current, pagerActive: false, pagerAcknowledged: false,
-          reputation: Math.max(0, stateRef.current.reputation - 5),
-          burnout: Math.min(100, stateRef.current.burnout + 5),
-        }});
-      }
-      if (s.pagerActive && critCount === 0) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current, pagerActive: false, pagerAcknowledged: false,
-        }});
-      }
-
-      // --- War Room Mode ---
-      if (critCount >= 3 && !s.warRoomActive) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current, warRoomActive: true, warRoomStartTime: now,
-        }});
-      } else if (critCount < 3 && s.warRoomActive) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current, warRoomActive: false,
-          warRoomsSurvived: stateRef.current.warRoomsSurvived + 1,
-          reputation: Math.min(100, stateRef.current.reputation + 5),
-        }});
-      }
-
-      // --- Status Page Accuracy ---
-      const statusOrder = ['operational', 'degraded', 'partial_outage', 'major_outage'];
-      let expectedLevel: typeof s.statusPageLevel = 'operational';
-      if (critCount >= 2) expectedLevel = 'major_outage';
-      else if (critCount >= 1) expectedLevel = 'partial_outage';
-      else if (warnCount >= 2) expectedLevel = 'degraded';
-      if (statusOrder.indexOf(s.statusPageLevel) < statusOrder.indexOf(expectedLevel) - 1 && elapsed > 30) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current, reputation: Math.max(0, stateRef.current.reputation - 0.05),
-        }});
-      }
-
-      // --- Post-Mortem Queue ---
-      if (s.resolvedIncidents > lastIncidentCountRef.current) {
-        lastIncidentCountRef.current = s.resolvedIncidents;
-        if (s.resolvedIncidents % 3 === 0 && s.postMortemQueue.length === 0) {
-          const latest = s.incidentHistory[s.incidentHistory.length - 1];
-          if (latest && latest.severity === 'CRIT') {
-            dispatch({ type: 'LOAD_GAME', state: {
-              ...stateRef.current, postMortemQueue: [...stateRef.current.postMortemQueue, {
-                incidentName: latest.name, severity: latest.severity,
-                targetNode: latest.targetNode, startTime: latest.startTime,
-                resolvedTime: latest.endTime, userImpact: stateRef.current.users * 0.3,
-                revenueLost: stateRef.current.revenue * (latest.endTime - latest.startTime) / 1000 * 0.5,
-              }],
-            }});
-          }
-        }
-      }
-
-      // --- Achievement Checking ---
-      const appInstances = Array.from(s.architecture.nodes.values())
-        .filter(n => n.type === 'APP' && n.redundancyGroup === 'app_cluster').length;
-      const am: AchievementMetrics = {
-        uptime: s.uptime, uptimeStreak: s.uptimeStreak, reputation: s.reputation,
-        cash: s.cash, users: s.users, resolvedIncidents: s.resolvedIncidents,
-        totalIncidents: s.totalIncidents, warRoomsSurvived: s.warRoomsSurvived,
-        postMortemsCompleted: s.postMortemsCompleted, techDebt: s.techDebt,
-        elapsedSeconds: elapsed, activeIncidents: s.activeIncidents,
-        appInstances, lowestReputation: lowestReputationRef.current,
-        highestReputation: s.reputation,
-      };
-      ACHIEVEMENTS.forEach(a => {
-        if (!s.achievements.has(a.id) && a.check(am)) {
-          dispatch({ type: 'UNLOCK_ACHIEVEMENT', achievementId: a.id });
-          persistAchievements(new Set([...s.achievements, a.id]));
-        }
-      });
-
-      // --- Expire Stakeholder Messages ---
-      const expired = stateRef.current.stakeholderMessages.filter(
-        m => !m.selectedResponse && m.expiresAt <= now
-      );
-      if (expired.length > 0) {
-        dispatch({ type: 'LOAD_GAME', state: {
-          ...stateRef.current,
-          stakeholderMessages: stateRef.current.stakeholderMessages.filter(
-            m => m.selectedResponse !== undefined || m.expiresAt > now
-          ),
-          reputation: Math.max(0, stateRef.current.reputation - expired.length * 2),
-        }});
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [state.aiSessionActive, state.paused, state.gameOver]);
+  const resetSubsystems = useGameSubsystems(state, dispatch);
 
   const handleNewGame = () => {
     const newSeed = generateSeed();
@@ -479,12 +327,10 @@ function App() {
     setSelectedIncident(null);
     // I6 FIX: Reset AI singleton for clean new game
     resetAIGameMaster();
+    resetTaskApiTracking(); // otherwise a new run inherits the previous run's exhausted task budget
     dispatch({ type: 'SET_AI_SESSION_ACTIVE', active: false });
     hasInitializedRef.current = false;
-    // Reset enhancement refs
-    stakeholderCooldowns.current = new Map();
-    lowestReputationRef.current = 100;
-    lastIncidentCountRef.current = 0;
+    resetSubsystems();
   };
 
   const handleTogglePause = () => {
@@ -493,20 +339,6 @@ function App() {
 
   const handleExecuteAction = (actionId: string, mitigatingIncidentId?: string) => {
     dispatch({ type: 'EXECUTE_ACTION', actionId, rng: rngRef.current, mitigatingIncidentId });
-    
-    // Log action to AI history (for context in future incidents)
-    if (stateRef.current.aiSessionActive) {
-      const gameMaster = getAIGameMaster();
-      if (gameMaster) {
-        const action = ACTIONS.find(a => a.id === actionId);
-        if (action) {
-          const context = mitigatingIncidentId 
-            ? `Mitigating incident: ${mitigatingIncidentId}` 
-            : 'Proactive action';
-          gameMaster.logUserAction(action.name, action.target, context);
-        }
-      }
-    }
   };
 
   const handleMitigateIncident = (incidentId: string, actionId: string) => {
@@ -516,12 +348,6 @@ function App() {
 
   const handleExecuteAIAction = (actionName: string, cost: number, duration: number, incidentId: string) => {
     dispatch({ type: 'EXECUTE_AI_ACTION', actionName, cost, duration, mitigatingIncidentId: incidentId });
-    
-    // Log AI action execution
-    const gameMaster = getAIGameMaster();
-    if (gameMaster) {
-      gameMaster.logUserAction(actionName, 'ai-suggested', `Mitigating: ${incidentId}`);
-    }
   };
 
   // Show loading screen while AI is initializing

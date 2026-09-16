@@ -80,6 +80,13 @@ export default function HudBar({
             {state.reputation.toFixed(0)}
           </span>
         </div>
+
+        <div className="hud-metric">
+          <span className="hud-label">API spend</span>
+          <span className="hud-value" title={`${state.tokenUsage.totalCalls} OpenAI calls, ~${state.tokenUsage.estimatedTokens} tokens`}>
+            ${state.tokenUsage.estimatedCostUSD.toFixed(3)}
+          </span>
+        </div>
       </div>
 
       <div className="hud-section hud-stress">

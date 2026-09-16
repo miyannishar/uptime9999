@@ -159,13 +159,6 @@ export function computeReputationDelta(
   return delta;
 }
 
-// Tech debt growth
-export function computeTechDebtGrowth(
-  quickFixes: number,
-  riskyActions: number
-): number {
-  return quickFixes * 0.5 + riskyActions * 1.0;
-}
 
 // Alert fatigue growth
 export function computeAlertFatigueGrowth(
@@ -175,82 +168,6 @@ export function computeAlertFatigueGrowth(
   return Math.min(2.0, activeIncidents * 0.1 + alertRules * 0.05);
 }
 
-// MTTR (Mean Time To Repair) multiplier
-export function computeMTTRMultiplier(
-  observabilityLevel: 'BASIC' | 'METRICS' | 'TRACES',
-  alertFatigue: number,
-  burnout: number,
-  sreHired: boolean
-): number {
-  let multiplier = 1.0;
-  
-  // Observability reduces MTTR
-  if (observabilityLevel === 'METRICS') multiplier *= 0.7;
-  else if (observabilityLevel === 'TRACES') multiplier *= 0.5;
-  
-  // Fatigue increases MTTR
-  multiplier *= 1 + (alertFatigue / 100) * 0.5;
-  multiplier *= 1 + (burnout / 100) * 0.8;
-  
-  // SRE reduces MTTR
-  if (sreHired) multiplier *= 0.6;
-  
-  return multiplier;
-}
 
-// Incident spawn rate multiplier
-export function computeHazardMultiplier(
-  utilization: number,
-  errorRate: number,
-  techDebt: number,
-  securityScore: number,
-  difficultyMultiplier: number
-): number {
-  const cfg = GAME_CONFIG.incidents.hazardMultipliers;
-  let multiplier = difficultyMultiplier;
-  
-  // High utilization increases incidents
-  if (utilization > cfg.utilizationThreshold) {
-    multiplier *= 1 + (utilization - cfg.utilizationThreshold) * cfg.utilizationFactor;
-  }
-  
-  // High error rate
-  if (errorRate > cfg.errorThreshold) {
-    multiplier *= 1 + errorRate * cfg.errorFactor;
-  }
-  
-  // Tech debt
-  multiplier *= 1 + (techDebt / 100) * cfg.techDebtFactor;
-  
-  // Security score
-  multiplier *= 1.5 - (securityScore * cfg.securityFactor);
-  
-  // Cap the multiplier to prevent death spiral
-  return Math.min(multiplier, cfg.maxHazardCap);
-}
 
-// Difficulty scaling over time
-export function computeDifficultyMultiplier(
-  elapsedSeconds: number,
-  peakUsers: number,
-  _uptimeStreak: number,
-  _cash: number
-): number {
-  const cfg = GAME_CONFIG.incidents;
-  let difficulty = cfg.baseDifficultyMultiplier;
-  
-  // Time-based increase
-  const timeFactor = Math.min(
-    cfg.maxDifficultyMultiplier,
-    1 + elapsedSeconds / cfg.difficultyTimeScale
-  );
-  difficulty *= timeFactor;
-  
-  // User-based increase
-  const userThresh = cfg.difficultyUserThresholds;
-  if (peakUsers > userThresh.high.users) difficulty *= userThresh.high.multiplier;
-  else if (peakUsers > userThresh.medium.users) difficulty *= userThresh.medium.multiplier;
-  
-  return difficulty;
-}
 

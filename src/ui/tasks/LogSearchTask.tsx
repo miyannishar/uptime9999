@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useElapsedSeconds } from '../../hooks/useElapsedSeconds';
 
 interface LogSearchTaskProps {
   logs: string[];
@@ -15,7 +16,7 @@ export default function LogSearchTask({
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState<'all' | 'error' | 'warn'>('all');
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const secondsElapsed = useElapsedSeconds();
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,11 +25,6 @@ export default function LogSearchTask({
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight / 3;
     }
 
-    // Timer for skip button
-    const interval = setInterval(() => {
-      setSecondsElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleLineClick = (index: number, line: string) => {
