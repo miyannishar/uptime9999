@@ -12,7 +12,6 @@ import { createComponentNode } from './componentInitializer';
 import { cloneGameState } from '../utils/stateUtils';
 import { tlog } from '../utils/terminalLog';
 import { COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
-import { deployComponent } from '../data/architecture';
 
 /**
  * O3: Shared helper for applying mitigation to related incidents (same root cause).
@@ -61,8 +60,7 @@ export type GameAction =
   | { type: 'SKIP_POSTMORTEM' }
   | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
   // Progressive architecture
-  | { type: 'DEPLOY_COMPONENT'; componentId: string }
-  | { type: 'DEPLOYMENT_COMPLETE'; componentId: string };
+  | { type: 'DEPLOY_COMPONENT'; componentId: string };
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
@@ -92,31 +90,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         durationSec: blueprint.deployDurationSec,
       });
       tlog.info(`🚀 Deploying ${blueprint.name} ($${blueprint.deployCost})...`);
-      return newState;
-    }
-
-    case 'DEPLOYMENT_COMPLETE': {
-      const blueprint = COMPONENT_BLUEPRINTS.find(b => b.id === action.componentId);
-      if (!blueprint) return state;
-
-      const newState = cloneGameState(state);
-      newState.deployingComponents.delete(action.componentId);
-      newState.deployedComponents.add(action.componentId);
-
-      // Add the component to the architecture
-      deployComponent(newState.architecture, action.componentId, blueprint.edges);
-
-      // Add recurring cost
-      newState.costs += blueprint.ongoingCostPerSec;
-
-      // Record deployment history
-      newState.componentDeploymentHistory.push({
-        componentId: action.componentId,
-        deployedAt: Date.now(),
-        cost: blueprint.deployCost,
-      });
-
-      tlog.success(`✅ ${blueprint.name} is now live!`);
       return newState;
     }
 

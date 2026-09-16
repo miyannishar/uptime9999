@@ -192,14 +192,6 @@ function App() {
       // Tick simulation on the LATEST state (includes any user action changes)
       const newState = tickSimulation(latestState, rngRef.current, dt);
 
-      // Check deployment timers
-      newState.deployingComponents.forEach((info, componentId) => {
-        const elapsed = (now - info.startTime) / 1000;
-        if (elapsed >= info.durationSec) {
-          dispatch({ type: 'DEPLOYMENT_COMPLETE', componentId });
-        }
-      });
-      
       // Update state FIRST (before async AI operations)
       dispatch({ type: 'LOAD_GAME', state: newState });
       

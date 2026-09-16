@@ -14,16 +14,3 @@ export const deployWhenAffordable: Policy = (s: GameState, t: number): GameActio
   return candidates.length ? [{ type: 'DEPLOY_COMPONENT', componentId: candidates[0].id }] : [];
 };
 
-/**
- * Replicates App.tsx's deployment completion. Needed only until Task 3 moves this
- * into tickSimulation — Task 3 deletes this policy.
- */
-export const completeDeploymentsLikeApp: Policy = (s: GameState): GameAction[] => {
-  const out: GameAction[] = [];
-  s.deployingComponents.forEach((info, id) => {
-    if ((Date.now() - info.startTime) / 1000 >= info.durationSec) {
-      out.push({ type: 'DEPLOYMENT_COMPLETE', componentId: id });
-    }
-  });
-  return out;
-};

@@ -14,8 +14,8 @@ import {
   computeAlertFatigueGrowth,
 } from './formulas';
 import { INCIDENTS } from '../data/incidents';
-import { createMinimalArchitecture } from '../data/architecture';
-import { STARTING_COMPONENTS } from '../config/progressionConfig';
+import { createMinimalArchitecture, deployComponent } from '../data/architecture';
+import { STARTING_COMPONENTS, COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric, clampAllMetrics } from './clampMetrics';
 import { cloneGameState } from '../utils/stateUtils';
@@ -223,6 +223,9 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
 
   // === 12. UPDATE STRESS ===
   updateStress(newState, dt);
+
+  // === 13. COMPLETE DEPLOYMENTS ===
+  completeDeployments(newState);
 
   return newState;
 }
@@ -1012,6 +1015,23 @@ function updateStress(state: GameState, dt: number) {
 
   // Tech debt natural decay
   state.techDebt = Math.max(0, state.techDebt - GAME_CONFIG.stress.techDebtDecay * dt);
+}
+
+function completeDeployments(state: GameState) {
+  const now = Date.now();
+  for (const [id, info] of Array.from(state.deployingComponents.entries())) {
+    if ((now - info.startTime) / 1000 < info.durationSec) continue;
+    state.deployingComponents.delete(id);
+    const bp = COMPONENT_BLUEPRINTS.find(b => b.id === id);
+    if (!bp) continue;
+    if (!deployComponent(state.architecture, id, bp.edges)) {
+      tlog.warn(`⚠️ ${bp.name} deployment produced no node — check basePositions/blueprint id`);
+      continue;
+    }
+    state.deployedComponents.add(id);
+    state.componentDeploymentHistory.push({ componentId: id, deployedAt: now, cost: bp.deployCost });
+    tlog.success(`✅ ${bp.name} is now live!`);
+  }
 }
 
 function checkGameOver(state: GameState) {

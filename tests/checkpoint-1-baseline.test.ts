@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { runSim, formatReport } from './harness';
-import { deployWhenAffordable, completeDeploymentsLikeApp } from './policies';
+import { deployWhenAffordable } from './policies';
 
 describe('CHECKPOINT 1 — baseline', () => {
   it('prints a 30-minute run and stays numerically sane', () => {
-    const r = runSim({ minutes: 30, policies: [deployWhenAffordable, completeDeploymentsLikeApp] });
+    const r = runSim({ minutes: 30, policies: [deployWhenAffordable] });
     console.log('\n=== BASELINE ===\n' + formatReport(r));
 
     const peakUtil = Math.max(...r.samples.map(s => s.maxUtil));
