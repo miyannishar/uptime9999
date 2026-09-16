@@ -569,13 +569,6 @@ function applyIncidentEffects(state: GameState, dt: number) {
     if (healthDecay) {
       const cappedDecay = Math.min(healthDecay, caps.maxHealthDecayPerSec);
       node.health = Math.max(0, node.health - cappedDecay * dt);
-      
-      // M3 FIX: Allow partial health recovery even during incidents
-      // Recover at 30% of normal rate so nodes don't stay permanently damaged
-      if (node.health < 1.0) {
-        const partialRecovery = 0.05 * GAME_CONFIG.metricRecovery.healthRecoveryDuringIncident * (1 - Math.min(0.7, node.utilization));
-        node.health = Math.min(1.0, node.health + partialRecovery * dt);
-      }
     } else if (node.health < 1.0) {
       // Natural health recovery when no incidents are affecting this node
       // Recover 5% health per second (slower if under load)
@@ -843,7 +836,8 @@ function updateBusiness(state: GameState, dt: number) {
 // All incidents are now AI-generated based on real system metrics
 
 function updateIncidents(state: GameState, _dt: number) {
-  let incidentsResolvedThisTick = 0;
+  let mitigatedThisTick = 0;
+  let autoResolvedThisTick = 0;
   
   state.activeIncidents = state.activeIncidents.filter(incident => {
     let wasResolved = false;
@@ -856,7 +850,7 @@ function updateIncidents(state: GameState, _dt: number) {
       const autoResolveTime = 300;
       if (elapsed > autoResolveTime) {
         state.resolvedIncidents++;
-        incidentsResolvedThisTick++;
+        autoResolvedThisTick++;
         wasResolved = true;
         state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       }
@@ -864,10 +858,10 @@ function updateIncidents(state: GameState, _dt: number) {
       // Fully mitigated (player resolved it!)
       if (!wasResolved && incident.mitigationLevel >= 1.0) {
         state.resolvedIncidents++;
-        incidentsResolvedThisTick++;
+        mitigatedThisTick++;
         wasResolved = true;
         state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
-        
+
         // O4: Direct call instead of dynamic import
         tlog.success(`🎉 Incident resolved! Reputation +${incident.severity === 'CRIT' ? '5' : incident.severity === 'WARN' ? '3' : '1'}`);
       }
@@ -884,7 +878,7 @@ function updateIncidents(state: GameState, _dt: number) {
     // Auto-resolve
     if (incidentDef.autoResolveSeconds && elapsed > incidentDef.autoResolveSeconds) {
       state.resolvedIncidents++;
-      incidentsResolvedThisTick++;
+      autoResolvedThisTick++;
       state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       return false;
     }
@@ -892,7 +886,7 @@ function updateIncidents(state: GameState, _dt: number) {
     // Fully mitigated (player resolved it!)
     if (incident.mitigationLevel >= 1.0) {
       state.resolvedIncidents++;
-      incidentsResolvedThisTick++;
+      mitigatedThisTick++;
       state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
       return false;
     }
@@ -901,19 +895,20 @@ function updateIncidents(state: GameState, _dt: number) {
   });
 
   // REWARD: Positive effects for resolving incidents!
-  if (incidentsResolvedThisTick > 0) {
-    // Reputation boost (more for critical incidents)
-    const reputationBoost = incidentsResolvedThisTick * 2; // +2 per incident
-    state.reputation = Math.min(100, state.reputation + reputationBoost);
-    
+  const resolvedThisTick = mitigatedThisTick + autoResolvedThisTick;
+  if (resolvedThisTick > 0) {
+    const boost = mitigatedThisTick * GAME_CONFIG.incidents.mitigatedReputationReward
+                + autoResolvedThisTick * GAME_CONFIG.incidents.autoResolveReputationReward;
+    state.reputation = Math.min(100, state.reputation + boost);
+
     // O4: Direct call instead of dynamic import
-    tlog.success(`✨ Resolved ${incidentsResolvedThisTick} incident(s)! Reputation +${reputationBoost}`);
+    tlog.success(`✨ Resolved ${resolvedThisTick} incident(s) (${mitigatedThisTick} fixed) — reputation +${boost.toFixed(1)}`);
   }
   
   // BREATHER MECHANIC: After resolving incidents, suppress new ones for 30s
   // BAL-7 FIX: Trigger when no CRIT/WARN remain (ignore lingering INFO incidents)
   const hasSeriousIncidents = state.activeIncidents.some(i => i.severity === 'CRIT' || i.severity === 'WARN');
-  if (incidentsResolvedThisTick > 0 && !hasSeriousIncidents) {
+  if (resolvedThisTick > 0 && !hasSeriousIncidents) {
     state.lastCalmPeriodEnd = Date.now() + GAME_CONFIG.session.calmPeriodAfterCritMs;
     tlog.info(`😌 All clear! 30 second breather before next incident wave.`);
   }

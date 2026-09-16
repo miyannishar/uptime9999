@@ -58,6 +58,10 @@ export const GAME_CONFIG = {
   // === INCIDENT SYSTEM ===
   incidents: {
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
+    // Reputation for a resolved incident. Auto-resolve pays less than acting, so
+    // ignoring an incident is never as good as fixing it.
+    mitigatedReputationReward: 3,
+    autoResolveReputationReward: 0,
     // AI Incident effect caps (prevent death spiral)
     aiEffectCaps: {
       maxHealthDecayPerSec: 0.003, // Max 0.3% health loss per second per node (even with multiple incidents)
@@ -112,7 +116,9 @@ export const GAME_CONFIG = {
   metricRecovery: {
     baseRecoveryRate: 0.03, // 3%/sec recovery toward baseline when no incident
     incidentRecoveryRate: 0.01, // 1%/sec partial recovery even during incidents
-    healthRecoveryDuringIncident: 0.3, // 30% of normal health recovery rate during incidents
+    // Recovery is suppressed entirely while a node is under an active incident;
+    // it resumes on the tick after the incident clears.
+    healthRecoveryDuringIncident: 0,
   },
 
   // === ACTION TIMINGS ===
