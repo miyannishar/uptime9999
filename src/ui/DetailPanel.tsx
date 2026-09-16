@@ -2,6 +2,7 @@ import React from 'react';
 import { GameState } from '../sim/types';
 import { INCIDENTS } from '../data/incidents';
 import { ACTIONS } from '../data/actions';
+import { getResolutionActions } from '../sim/incidentActions';
 import TaskModal from './TaskModal';
 
 interface DetailPanelProps {
@@ -342,7 +343,7 @@ export default function DetailPanel({
                       selectedIncident.aiSuggestedActions.map((aiAction, idx) => {
                         const canExecute = state.cash >= aiAction.cost;
                         const isInProgress = state.actionsInProgress.some(
-                          a => a.actionId === `ai_${aiAction.actionName.replace(/\s+/g, '_').toLowerCase()}` && 
+                          a => a.actionId === `ai_${aiAction.actionName.replace(/\s+/g, '_').toLowerCase()}` &&
                                a.mitigatingIncidentId === selectedIncident.id
                         );
 
@@ -376,56 +377,52 @@ export default function DetailPanel({
                           </button>
                         );
                       })
-                    ) : !incidentDef || incidentDef.resolutionOptions.length === 0 ? (
-                      <p className="no-actions">This incident auto-resolves over time</p>
                     ) : (
                       <>
-                        {incidentDef && incidentDef.resolutionOptions
-                          .filter(actionId => {
-                            // Only show actions that are available (not on long cooldown)
-                            const cooldown = getCooldownRemaining(actionId);
-                            return cooldown < 30; // Only hide if cooldown > 30s
-                          })
-                          .map(actionId => {
-                        const action = ACTIONS.find(a => a.id === actionId);
-                        if (!action) return null;
+                        {!selectedIncident.aiGenerated && (
+                          <div className="suggested-actions">
+                            {getResolutionActions(selectedIncident).map(action => {
+                              const canExecute = canExecuteAction(action.id);
+                              const cooldown = getCooldownRemaining(action.id);
+                              const activeAction = state.actionsInProgress.find(
+                                a => a.actionId === action.id && a.mitigatingIncidentId === selectedIncident.id
+                              );
+                              const isInProgress = !!activeAction;
 
-                        const canExecute = canExecuteAction(actionId);
-                        const cooldown = getCooldownRemaining(actionId);
-                        const activeAction = state.actionsInProgress.find(
-                          a => a.actionId === actionId && a.mitigatingIncidentId === selectedIncident.id
-                        );
-                        const isInProgress = !!activeAction;
+                              // Calculate actual time remaining if in progress
+                              let timeDisplay = '';
+                              if (isInProgress && activeAction) {
+                                const remaining = Math.max(0, Math.ceil((activeAction.endTime - Date.now()) / 1000));
+                                timeDisplay = `${remaining}s remaining`;
+                              } else if (cooldown > 0) {
+                                timeDisplay = `Cooldown: ${cooldown}s`;
+                              } else if (action.durationSeconds > 0) {
+                                timeDisplay = `Duration: ${action.durationSeconds}s`;
+                              }
 
-                        // Calculate actual time remaining if in progress
-                        let timeDisplay = '';
-                        if (isInProgress && activeAction) {
-                          const remaining = Math.max(0, Math.ceil((activeAction.endTime - Date.now()) / 1000));
-                          timeDisplay = `${remaining}s remaining`;
-                        } else if (cooldown > 0) {
-                          timeDisplay = `Cooldown: ${cooldown}s`;
-                        } else if (action.durationSeconds > 0) {
-                          timeDisplay = `Duration: ${action.durationSeconds}s`;
-                        }
-
-                        return (
-                          <button
-                            key={actionId}
-                            className={`action-button resolution ${isInProgress ? 'in-progress' : ''}`}
-                            onClick={() => onMitigateIncident(selectedIncident.id, actionId)}
-                            disabled={!canExecute || cooldown > 0 || isInProgress}
-                          >
-                            <div className="action-name">
-                              {action.name}
-                              {isInProgress && ' ⏳'}
-                            </div>
-                            <div className="action-cost">
-                              ${action.oneTimeCost}
-                              {timeDisplay && ` • ${timeDisplay}`}
-                            </div>
-                          </button>
-                        );
-                          })}
+                              return (
+                                <button
+                                  key={action.id}
+                                  className={`action-button ${isInProgress ? 'in-progress' : ''}`}
+                                  disabled={!canExecute || cooldown > 0 || isInProgress}
+                                  onClick={() => onMitigateIncident(selectedIncident.id, action.id)}
+                                >
+                                  <div className="action-name">
+                                    {action.name}
+                                    {isInProgress && ' ⏳'}
+                                  </div>
+                                  <div className="action-cost">
+                                    ${action.oneTimeCost}
+                                    {timeDisplay && ` • ${timeDisplay}`}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                            {getResolutionActions(selectedIncident).length === 0 && (
+                              <p className="no-actions">This incident auto-resolves over time</p>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
