@@ -53,6 +53,7 @@ export function spawnFromTemplates(state: GameState, rng: SeededRNG, dt: number)
       targetNodeId: target.id,
       severity: def.severity,
       startTime: Date.now(),
+      startSim: state.elapsedSim,
       escalationTimer: 0,
       outagetimer: def.timeToOutageSeconds ?? 0,
       mitigationLevel: 0,

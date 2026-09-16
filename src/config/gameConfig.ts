@@ -16,9 +16,9 @@ export const GAME_CONFIG = {
   economy: {
     revenuePerUserPerDay: 25,
     bankruptcyThreshold: -5000,
-    // Phase 3 soft-floor: reputation must stay at 0 for this many ticks before game over.
-    // At 0.1s/tick that's 300 simulated seconds (5 min) — long enough for incident waves to
-    // resolve and reputation to recover before a run ends prematurely.
+    // Phase 3 soft-floor: reputation must stay at 0 for this many simulated seconds before game over.
+    // At dt=0.1s/tick: 3000s / 0.1 = 30,000 ticks = 3000 real seconds (~50 min) — generous enough
+    // to weather prolonged incident waves without premature game-over.
     reputationGameOverGracePeriod: 3000,
   },
 
@@ -153,7 +153,8 @@ export const GAME_CONFIG = {
   simulation: {
     tickIntervalMs: 100, // real time between ticks
     defaultSimDt: 1, // simulated seconds per tick
-    uptimeWindowSize: 300, // 5 minutes
+    uptimeWindowSeconds: 300, // rolling window for the uptime average
+    tickSeconds: 0.1,         // real seconds per tick; App's interval must match
   },
 
   // === TRAFFIC ===

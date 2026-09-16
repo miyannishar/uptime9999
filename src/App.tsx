@@ -210,7 +210,7 @@ function App() {
           });
         }
       }
-    }, 100); // 100ms tick
+    }, GAME_CONFIG.simulation.tickSeconds * 1000); // tickSeconds * 1000 ms tick
 
     return () => {
       clearInterval(interval);

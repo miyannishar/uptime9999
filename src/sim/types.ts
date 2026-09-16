@@ -196,6 +196,7 @@ export interface ActiveIncident {
   targetNodeId: string;
   severity: IncidentSeverity;
   startTime: number;
+  startSim: number; // elapsedSim at creation — use this for duration comparisons
   escalationTimer: number;
   outagetimer: number;
   mitigationLevel: number; // 0-1, base completed mitigation
@@ -224,6 +225,7 @@ export interface ActionInProgress {
   actionId: string;
   startTime: number;
   endTime: number;
+  startSim: number; // elapsedSim at creation — use this for duration comparisons
   targetNodeId?: string;
   mitigatingIncidentId?: string; // Track which incident this action is mitigating
 }
@@ -297,6 +299,7 @@ export interface GameState {
   
   // Internal timers
   reputationZeroTimer: number;
+  elapsedSim: number; // simulated seconds since run start; advances by dt, not wall clock
   
   // Run stats
   totalProfit: number;

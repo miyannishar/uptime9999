@@ -667,6 +667,7 @@ function executeAction(
         actionId,
         startTime: Date.now(),
         endTime: Date.now() + actionDef.durationSeconds * 1000,
+        startSim: newState.elapsedSim,
         targetNodeId: actionDef.target !== 'global' ? actionDef.target : undefined,
         mitigatingIncidentId, // Optional: only set when mitigating an incident
       },
@@ -763,6 +764,7 @@ function executeAIAction(
       actionId: `ai_${actionName.replace(/\s+/g, '_').toLowerCase()}`,
       startTime: Date.now(),
       endTime: Date.now() + duration * 1000,
+      startSim: newState.elapsedSim,
       mitigatingIncidentId,
     },
   ];
@@ -804,6 +806,7 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
     targetNodeId: aiIncident.targetNodeId,
     severity: aiIncident.severity,
     startTime: Date.now(),
+    startSim: state.elapsedSim,
     escalationTimer: 0,
     outagetimer: aiIncident.autoResolveSeconds || 300,
     mitigationLevel: 0,
@@ -869,6 +872,7 @@ function debugSpawnIncident(state: GameState, incidentId: string, targetNodeId: 
     targetNodeId,
     severity: incidentDef.severity,
     startTime: Date.now(),
+    startSim: state.elapsedSim,
     escalationTimer: incidentDef.escalationTimeSeconds || 0,
     outagetimer: incidentDef.timeToOutageSeconds || 0,
     mitigationLevel: 0,

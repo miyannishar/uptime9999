@@ -68,7 +68,7 @@ export function createInitialState(seed: string): GameState {
     globalErrorRate: 0,
     globalLatencyP95: 0,
     uptime: 1.0,
-    uptimeWindow: Array(GAME_CONFIG.simulation.uptimeWindowSize).fill(1),
+    uptimeWindow: Array(Math.round(GAME_CONFIG.simulation.uptimeWindowSeconds / GAME_CONFIG.simulation.tickSeconds)).fill(1),
     uptimeStreak: 0,
     longestStreak: 0,
 
@@ -98,6 +98,7 @@ export function createInitialState(seed: string): GameState {
     gameOver: false,
 
     reputationZeroTimer: 0,
+    elapsedSim: 0,
 
     totalProfit: 0,
     totalIncidents: 0,
@@ -177,6 +178,7 @@ export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1)
 
   // O1: Use centralized deep-clone utility instead of inline copy-paste
   const newState = cloneGameState(state);
+  newState.elapsedSim += dt;
 
   const elapsed = (Date.now() - state.startTime) / 1000;
 
@@ -222,7 +224,7 @@ export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1)
   updateActions(newState, dt);
 
   // === 11. CHECK GAME OVER ===
-  checkGameOver(newState);
+  checkGameOver(newState, dt);
 
   // === 12. UPDATE STRESS ===
   updateStress(newState, dt);
@@ -523,6 +525,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
             targetNodeId: incident.targetNodeId,
             severity: escalatedDef.severity,
             startTime: Date.now(),
+            startSim: state.elapsedSim,
             escalationTimer: escalatedDef.escalationTimeSeconds || 0,
             outagetimer: escalatedDef.timeToOutageSeconds || 0,
             mitigationLevel: 0,
@@ -534,7 +537,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
 
     // Spread: a long-running unmitigated incident can pull in a neighbouring type
     if (incidentDef.spreadsTo?.length && incident.mitigationLevel < 0.5) {
-      const age = (Date.now() - incident.startTime) / 1000;
+      const age = state.elapsedSim - incident.startSim;
       if (age > GAME_CONFIG.incidents.spreadAfterSeconds) {
         const already = new Set(state.activeIncidents.map(i => i.targetNodeId));
         const victim = Array.from(state.architecture.nodes.values()).find(
@@ -547,6 +550,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
             targetNodeId: victim.id,
             severity: incident.severity,
             startTime: Date.now(),
+            startSim: state.elapsedSim,
             escalationTimer: 0,
             outagetimer: incidentDef.timeToOutageSeconds ?? 0,
             mitigationLevel: 0,
@@ -875,8 +879,8 @@ function updateIncidents(state: GameState, _dt: number) {
     
     // AI-generated incidents
     if (incident.aiGenerated) {
-      const elapsed = (Date.now() - incident.startTime) / 1000;
-      
+      const elapsed = state.elapsedSim - incident.startSim;
+
       // Auto-resolve AI incidents after 300s (outagetimer is for node-down countdown, not auto-resolve)
       const autoResolveTime = 300;
       if (elapsed > autoResolveTime) {
@@ -904,7 +908,7 @@ function updateIncidents(state: GameState, _dt: number) {
     const incidentDef = INCIDENTS.find(i => i.id === incident.definitionId);
     if (!incidentDef) return false;
 
-    const elapsed = (Date.now() - incident.startTime) / 1000;
+    const elapsed = state.elapsedSim - incident.startSim;
 
     // Auto-resolve
     if (incidentDef.autoResolveSeconds && elapsed > incidentDef.autoResolveSeconds) {
@@ -946,21 +950,22 @@ function updateIncidents(state: GameState, _dt: number) {
 }
 
 function updateActions(state: GameState, _dt: number) {
-  const now = Date.now();
   const mitigationPerAction = GAME_CONFIG.incidents.mitigationPerAction;
 
   // Update mitigation progress for incidents
   state.activeIncidents.forEach(incident => {
     // Find the active (in-progress) mitigation action for this incident
-    const activeAction = state.actionsInProgress.find(
-      a => a.mitigatingIncidentId === incident.id && now < a.endTime
-    );
-    
+    const activeAction = state.actionsInProgress.find(a => {
+      if (a.mitigatingIncidentId !== incident.id) return false;
+      const durationSec = (a.endTime - a.startTime) / 1000;
+      return state.elapsedSim < a.startSim + durationSec;
+    });
+
     if (activeAction) {
-      const duration = activeAction.endTime - activeAction.startTime;
-      const elapsed = Math.max(0, now - activeAction.startTime);
-      const progress = Math.min(1.0, elapsed / duration);
-      
+      const durationSec = (activeAction.endTime - activeAction.startTime) / 1000;
+      const elapsed = Math.max(0, state.elapsedSim - activeAction.startSim);
+      const progress = Math.min(1.0, elapsed / durationSec);
+
       // Show real-time progress: base mitigation + current action progress
       // Use config for mitigation amount
       incident.mitigationProgress = Math.min(1.0, incident.mitigationLevel + (progress * mitigationPerAction));
@@ -972,7 +977,8 @@ function updateActions(state: GameState, _dt: number) {
 
   // Remove completed actions and finalize their mitigation
   state.actionsInProgress = state.actionsInProgress.filter(action => {
-    if (now >= action.endTime) {
+    const durationSec = (action.endTime - action.startTime) / 1000;
+    if (state.elapsedSim >= action.startSim + durationSec) {
       // O4: Direct calls instead of dynamic imports
       soundNotifications.playActionComplete();
       tlog.success('═══════════════════════════════════════════════');
@@ -1073,7 +1079,7 @@ function completeDeployments(state: GameState) {
   }
 }
 
-function checkGameOver(state: GameState) {
+function checkGameOver(state: GameState, dt: number) {
   if (state.cash < GAME_CONFIG.economy.bankruptcyThreshold) {
     state.gameOver = true;
     state.gameOverReason = 'Bankruptcy - Cash depleted';
@@ -1081,7 +1087,7 @@ function checkGameOver(state: GameState) {
 
   if (state.reputation <= 0) {
     // O5: Use typed field instead of (state as any) cast
-    state.reputationZeroTimer += 1;
+    state.reputationZeroTimer += dt;
     
     // Game over only if reputation stays at 0 for configured grace period
     if (state.reputationZeroTimer >= GAME_CONFIG.economy.reputationGameOverGracePeriod) {
