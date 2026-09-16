@@ -21,6 +21,8 @@ export function cloneGameState(state: GameState): GameState {
     ])
   );
 
+  // Primitive fields (numbers, strings, booleans) — including recurringCostAdjustment —
+  // are correctly shallow-copied by the spread below. No explicit entry is needed.
   return {
     ...state,
     architecture: clonedArchitecture,

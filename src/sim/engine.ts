@@ -14,6 +14,7 @@ import {
   computeAlertFatigueGrowth,
 } from './formulas';
 import { INCIDENTS } from '../data/incidents';
+import { ACTIONS } from '../data/actions';
 import { createMinimalArchitecture, deployComponent } from '../data/architecture';
 import { STARTING_COMPONENTS, COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
 import { GAME_CONFIG } from '../config/gameConfig';
@@ -59,6 +60,7 @@ export function createInitialState(seed: string): GameState {
     cash: GAME_CONFIG.starting.cash,
     revenue: 0,
     costs: 0,
+    recurringCostAdjustment: 0,
     pricing: GAME_CONFIG.starting.pricing,
     reputation: GAME_CONFIG.starting.reputation,
 
@@ -730,7 +732,8 @@ function updateBusiness(state: GameState, dt: number) {
     }
   });
 
-  state.costs = infrastructureCost;
+  // recurringCostAdjustment is a primitive, so the spread in cloneGameState already copies it.
+  state.costs = Math.max(0, infrastructureCost + state.recurringCostAdjustment);
 
   // Compute base revenue
   let revenue = computeRevenue(state.users, state.pricing, state.reputation, state.uptime);
@@ -947,7 +950,13 @@ function updateActions(state: GameState, _dt: number) {
       tlog.success('═══════════════════════════════════════════════');
       tlog.success(`✅ ACTION COMPLETED: ${action.actionId}`);
       tlog.success('═══════════════════════════════════════════════');
-      
+
+      // Accumulate recurring cost delta when the action completes (not when it starts)
+      const completedActionDef = ACTIONS.find(a => a.id === action.actionId);
+      if (completedActionDef?.recurringCostDelta) {
+        state.recurringCostAdjustment += completedActionDef.recurringCostDelta;
+      }
+
       // Action complete - finalize mitigation if it was mitigating an incident
       if (action.mitigatingIncidentId) {
         const incident = state.activeIncidents.find(i => i.id === action.mitigatingIncidentId);

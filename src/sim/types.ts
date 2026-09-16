@@ -256,6 +256,7 @@ export interface GameState {
   cash: number;
   revenue: number; // per second
   costs: number; // per second
+  recurringCostAdjustment: number; // accumulated $/sec from action effects
   pricing: number; // revenue per user per day
   reputation: number; // 0-100
   
