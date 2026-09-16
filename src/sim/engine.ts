@@ -23,6 +23,7 @@ import { cloneGameState } from '../utils/stateUtils';
 import { tlog } from '../utils/terminalLog';
 import { soundNotifications } from '../utils/soundNotifications';
 import { applyRelatedMitigation } from './reducer';
+import { spawnFromTemplates } from './incidentSpawner';
 
 export function createInitialState(seed: string): GameState {
   const architecture = createMinimalArchitecture();
@@ -171,7 +172,7 @@ function buildRedundancyGroupMap(nodes: Map<string, ComponentNode>): Map<string,
   return groups;
 }
 
-export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1): GameState {
+export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1): GameState {
   if (state.paused || state.gameOver) return state;
 
   // O1: Use centralized deep-clone utility instead of inline copy-paste
@@ -205,7 +206,7 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
   updateBusiness(newState, dt);
 
   // === 7. INCIDENTS ===
-  // All incidents are now AI-generated based on system metrics
+  spawnFromTemplates(newState, rng, dt);
   
   // === 8. CLEANUP OLD INCIDENT TARGETS ===
   // Remove targets older than 60 seconds to allow re-targeting

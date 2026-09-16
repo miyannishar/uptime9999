@@ -16,7 +16,10 @@ export const GAME_CONFIG = {
   economy: {
     revenuePerUserPerDay: 25,
     bankruptcyThreshold: -5000,
-    reputationGameOverGracePeriod: 60, // seconds at 0 before game over
+    // Phase 3 soft-floor: reputation must stay at 0 for this many ticks before game over.
+    // At 0.1s/tick that's 300 simulated seconds (5 min) — long enough for incident waves to
+    // resolve and reputation to recover before a run ends prematurely.
+    reputationGameOverGracePeriod: 3000,
   },
 
   // === USER GROWTH ===
@@ -57,6 +60,9 @@ export const GAME_CONFIG = {
 
   // === INCIDENT SYSTEM ===
   incidents: {
+    // Global scale on template baseRatePerMinute (they sum to ~1.36/min unscaled).
+    spawnRateMultiplier: 0.5,
+    maxConcurrent: 6,
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
     // Reputation for a resolved incident. Auto-resolve pays less than acting, so
     // ignoring an incident is never as good as fixing it.
