@@ -308,7 +308,9 @@ function propagateLoad(state: GameState, ingressRPS: number) {
         // O2: Use pre-built redundancy group map
         if (target.redundancyGroup) {
           const allGroupInstances = redundancyGroups.get(target.redundancyGroup) || [];
-          const healthyInstances = allGroupInstances.filter(n => n.enabled && n.health > 0.3);
+          const healthyInstances = allGroupInstances.filter(
+            n => n.enabled && n.health > 0.3 && n.scaling.current > 0
+          );
           
           if (healthyInstances.length > 0) {
             const loadPerInstance = propagatedLoad / healthyInstances.length;

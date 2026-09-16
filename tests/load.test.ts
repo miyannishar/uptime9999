@@ -18,3 +18,20 @@ describe('load model', () => {
     expect(dbWith).toBeLessThan(dbBare * 0.8);
   });
 });
+
+describe('redundancy', () => {
+  it('gives a deployed db_replica real capacity', () => {
+    const r = runSim({ minutes: 14, policies: [deployWhenAffordable] });
+    if (!r.final.deployedComponents.has('db_replica')) return; // ladder didn't reach it; not a failure
+    const replica = r.final.architecture.nodes.get('db_replica')!;
+    expect(replica.scaling.current).toBeGreaterThan(0);
+    expect(replica.capacity * replica.scaling.current).toBeGreaterThan(0);
+  });
+
+  it('only splits load across members that can serve it', () => {
+    const r = runSim({ minutes: 14, policies: [deployWhenAffordable] });
+    r.final.architecture.nodes.forEach(n => {
+      if (n.enabled && n.scaling.current === 0) expect(n.loadIn).toBe(0);
+    });
+  });
+});

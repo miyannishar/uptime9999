@@ -526,7 +526,7 @@ export function createInitialArchitecture(): {
     health: 1,
     reliabilityScore: 0.98,
     securityScore: 0.9,
-    scaling: { min: 0, max: 3, current: 0, cooldownUntil: 0 },
+    scaling: { min: 1, max: 3, current: 1, cooldownUntil: 0 },
     utilization: 0,
     latency: 25,
     errorRate: 0.003,
