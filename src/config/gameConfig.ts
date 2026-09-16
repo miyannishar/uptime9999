@@ -85,6 +85,18 @@ export const GAME_CONFIG = {
     immediateMitigationOnActionStart: 0.3, // 30% mitigation applied immediately when action starts
   },
 
+  // === AI / OPENAI ===
+  // Single source of truth for both callers (aiGameMaster + taskGenerator) so the
+  // model and its pricing can't drift apart between them.
+  ai: {
+    model: 'gpt-4.1',
+    inputCostPerToken: 2.0 / 1_000_000,  // $2.00 / 1M input tokens
+    outputCostPerToken: 8.0 / 1_000_000, // $8.00 / 1M output tokens
+    // 1500 truncated the "log" task type (50-100 log lines) mid-JSON; 4000 is only a
+    // ceiling, billing follows actual usage (incidents ~1000, log tasks ~1900)
+    maxCompletionTokens: 4000,
+  },
+
   // === SESSION MANAGEMENT ===
   session: {
     maxDurationMs: 30 * 60 * 1000, // 30 minute hard cap

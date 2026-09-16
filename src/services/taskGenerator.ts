@@ -1,5 +1,7 @@
 // Task Generator - Uses OpenAI to generate interactive technical tasks
 import { GAME_CONFIG } from '../config/gameConfig';
+import { tlog } from '../utils/terminalLog';
+import { chatJSON, parseJSON, errMsg } from './openai';
 
 // A6 FIX: Shared API call tracking with aiGameMaster
 // Prevents task generation from bypassing session limits
@@ -210,81 +212,39 @@ Generate ONE appropriate interactive task. Respond with JSON only.`;
   try {
     // A6 FIX: Check session limits before making API call
     if (!shouldAllowTaskApiCall()) {
-      console.warn('[TaskGenerator] API call budget exhausted, skipping task generation');
+      tlog.warn('⚠️ Task generation skipped: API call budget exhausted');
       return null;
     }
-    
-    if (taskSessionStart === 0) {
-      taskSessionStart = Date.now();
-    }
+
+    if (taskSessionStart === 0) taskSessionStart = Date.now();
     taskApiCallCount++;
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 1.0,
-        max_tokens: 1500,
-      }),
-    });
 
-    const responseData = await response.json().catch(async () => {
-      return null;
-    });
+    const { content } = await chatJSON(apiKey, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], 1.0);
 
-    if (!response.ok) {
+    const task = parseJSON<TaskData>(content);
+    if (!task?.type || !task.data) {
+      tlog.error(`❌ Task JSON missing type/data: ${content.slice(0, 300)}`);
       return null;
     }
 
-    const data = responseData;
-    const content = data.choices[0].message.content;
-    
-    // Parse JSON response
-    const cleanedContent = content
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-    
-    let taskData: TaskData;
-    try {
-      taskData = JSON.parse(cleanedContent);
-    } catch (parseError) {
-      return null;
-    }
-    
-    // VALIDATE: For config tasks, ensure the content actually contains currentValue
-    if (taskData.type === 'config') {
-      const { content, targetKey, currentValue, targetValue } = taskData.data;
-      
-      // Check if content contains the key with current value
-      const hasCurrentValue = 
-        content.includes(`${targetKey}=${currentValue}`) ||
-        content.includes(`${targetKey}: ${currentValue}`) ||
-        content.includes(`${targetKey} ${currentValue}`) ||
-        content.includes(`_${targetKey}=${currentValue}`) ||
-        content.includes(`_${targetKey}: ${currentValue}`) ||
-        content.includes(`_${targetKey} ${currentValue}`);
-      
-      if (!hasCurrentValue) {
-        return null; // Reject inconsistent tasks
-      }
-      
-      // Also check that target value is different from current
-      if (currentValue === targetValue) {
+    // Config tasks are unplayable unless the file content really contains targetKey/currentValue
+    if (task.type === 'config') {
+      const { content: file, targetKey, currentValue, targetValue } = task.data;
+      const present = typeof file === 'string' && ['=', ': ', ' '].some(sep =>
+        file.includes(`${targetKey}${sep}${currentValue}`) || file.includes(`_${targetKey}${sep}${currentValue}`));
+      if (!present || currentValue === targetValue) {
+        tlog.warn(`⚠️ Rejecting config task "${targetKey}": ${present ? 'currentValue equals targetValue' : 'value absent from file content'}`);
         return null;
       }
     }
-    
-    return taskData;
+
+    tlog.debug(`✅ Task type=${task.type}`);
+    return task;
   } catch (error) {
+    tlog.error(`❌ generateTask failed: ${errMsg(error)}`);
     return null;
   }
 }

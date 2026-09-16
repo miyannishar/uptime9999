@@ -3,6 +3,8 @@
 import { GameState } from '../sim/types';
 
 import { GAME_CONFIG } from '../config/gameConfig';
+import { tlog } from '../utils/terminalLog';
+import { chatJSON, parseJSON, errMsg, ChatMessage } from './openai';
 
 export interface AIIncidentResponse {
   incidentId: string;
@@ -45,10 +47,7 @@ export interface AIMetricsUpdate {
   nextIncidentHint?: string;
 }
 
-export interface ConversationMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+export type ConversationMessage = ChatMessage;
 
 class AIGameMaster {
   private apiKey: string;
@@ -206,63 +205,24 @@ class AIGameMaster {
 
     const prompt = this.buildIncidentPrompt(currentState, requiredSeverity);
     
-    // Debug logging for AI communication
-    if (import.meta.env.VITE_LOG_LEVEL === 'DEBUG') {
-      import('../utils/terminalLog').then(({ tlog }) => {
-        tlog.debug('');
-        tlog.debug('🤖 ═══════════ AI REQUEST ═══════════');
-        tlog.debug(`Prompt length: ${prompt.length} chars`);
-        tlog.debug('Sending to OpenAI GPT-4o-mini...');
-        tlog.debug(prompt.substring(0, 500) + '...');
-        tlog.debug('═══════════════════════════════════════');
-      });
-    }
-    
-    // Limit conversation history aggressively - only keep system message and current request
-    // This prevents token accumulation from growing conversation history
-    // Context is provided via the prompt itself (recent incidents summary, current state)
-    this.conversationHistory = [
-      this.conversationHistory[0], // Keep only system message
-    ];
+    tlog.debug(`🤖 → ${prompt.length} chars: ${prompt.slice(0, 300)}`);
 
-    this.conversationHistory.push({
-      role: 'user',
-      content: prompt,
-    });
+    // Drop prior turns: context lives in the prompt itself, so history would only burn tokens
+    this.conversationHistory = [this.conversationHistory[0], { role: 'user', content: prompt }];
 
     try {
       const response = await this.callOpenAI();
-      
-      // Debug logging for AI response
-      if (import.meta.env.VITE_LOG_LEVEL === 'DEBUG') {
-        import('../utils/terminalLog').then(({ tlog }) => {
-          tlog.debug('');
-          tlog.debug('🤖 ═══════════ AI RESPONSE ═══════════');
-          tlog.debug(`Response length: ${response.length} chars`);
-          tlog.debug('Raw response:');
-          tlog.debug(response);
-          tlog.debug('═══════════════════════════════════════');
-        });
-      }
-      
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response,
-      });
+      tlog.debug(`🤖 ← ${response.length} chars: ${response}`);
+      this.conversationHistory.push({ role: 'assistant', content: response });
 
       const incident = this.parseIncidentResponse(response);
-      
-      if (!incident) {
-        return null;
-      }
-      
-      // Ensure incident matches the required severity (AI sometimes ignores instructions)
-      if (incident.severity !== requiredSeverity) {
-        incident.severity = requiredSeverity;
-      }
-      
+      if (!incident) return null;
+
+      // AI sometimes ignores the requested severity
+      incident.severity = requiredSeverity;
       return incident;
     } catch (error) {
+      tlog.error(`❌ generateIncident failed: ${errMsg(error)}`);
       return null;
     }
   }
@@ -555,84 +515,30 @@ Respond JSON only.`;
 
 
   private async callOpenAI(): Promise<string> {
-    // Track call
     this.totalApiCalls++;
     this.lastApiCallTime = Date.now();
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: this.conversationHistory,
-        temperature: 1.2, // Increased for more creativity and variety
-        max_tokens: 1500,
-      }),
-    });
 
-    const responseData = await response.json().catch(async (err) => {
-      throw err;
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(responseData)}`);
+    const { content, usage } = await chatJSON(this.apiKey, this.conversationHistory, 1.2);
+    if (usage) {
+      this.estimatedTokensUsed += usage.total_tokens ?? 0;
+      this.estimatedCostUSD += (usage.prompt_tokens ?? 0) * GAME_CONFIG.ai.inputCostPerToken
+                             + (usage.completion_tokens ?? 0) * GAME_CONFIG.ai.outputCostPerToken;
     }
-
-    // Track token usage from response
-    if (responseData.usage) {
-      const tokens = responseData.usage.total_tokens || 0;
-      this.estimatedTokensUsed += tokens;
-      // gpt-4o-mini: ~$0.15/1M input, ~$0.60/1M output
-      this.estimatedCostUSD += (responseData.usage.prompt_tokens || 0) * 0.00000015 
-                             + (responseData.usage.completion_tokens || 0) * 0.0000006;
-    }
-
-    return responseData.choices[0].message.content;
+    return content;
   }
 
   private parseIncidentResponse(response: string): AIIncidentResponse | null {
-    try {
-      // Extract JSON from response (might have markdown code blocks)
-      let jsonStr = response.trim();
-      
-      // Remove markdown code blocks if present
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      // Fix invalid JSON: remove unary + signs from numbers (e.g., "+7000" -> "7000")
-      // Match pattern: ": +number" (with optional whitespace) - JSON doesn't support unary +
-      jsonStr = jsonStr.replace(/:\s*\+(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, ': $1');
-      
-      const parsed = JSON.parse(jsonStr);
-      
-      // Validate structure
-      if (!parsed.incidentId || !parsed.incidentName || !parsed.targetNodeId) {
-        return null;
-      }
-
-      return parsed as AIIncidentResponse;
-    } catch (error) {
+    const parsed = parseJSON<AIIncidentResponse>(response);
+    if (!parsed) return null;
+    if (!parsed.incidentId || !parsed.incidentName || !parsed.targetNodeId) {
+      tlog.error(`❌ Incident JSON missing incidentId/incidentName/targetNodeId: ${JSON.stringify(parsed).slice(0, 300)}`);
       return null;
     }
+    return parsed;
   }
 
   private parseMetricsUpdate(response: string): AIMetricsUpdate | null {
-    try {
-      let jsonStr = response.trim();
-      
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```\n?/g, '');
-      }
-      
-      const parsed = JSON.parse(jsonStr);
-      return parsed as AIMetricsUpdate;
-    } catch (error) {
-      return null;
-    }
+    return parseJSON<AIMetricsUpdate>(response);
   }
 
   getConversationHistory(): ConversationMessage[] {

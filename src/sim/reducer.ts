@@ -832,7 +832,8 @@ function spawnAIIncident(state: GameState, aiIncident: any): GameState {
     aiGenerated: true,
     aiIncidentName: aiIncident.incidentName,
     aiDescription: aiIncident.description,
-    aiLogs: aiIncident.logs || '',
+    // The model returns logs as either a string or an array of lines; LogsModal does .split()
+    aiLogs: Array.isArray(aiIncident.logs) ? aiIncident.logs.join('\n') : aiIncident.logs || '',
     aiSuggestedActions: aiIncident.suggestedActions,
     aiEffects: aiIncident.effects,
     aiCategory: aiIncident.category,

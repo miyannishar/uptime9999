@@ -290,8 +290,8 @@ function App() {
           } else {
             tlog.warn('⚠️ AI returned null - no incident generated');
           }
-            }).catch(() => {
-              // Error handled silently
+            }).catch(err => {
+              tlog.error(`❌ Incident generation failed: ${err instanceof Error ? err.message : String(err)}`);
             });
           }
         }
