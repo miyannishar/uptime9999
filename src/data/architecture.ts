@@ -40,7 +40,7 @@ export function createInitialArchitecture(): {
     name: 'DNS',
     enabled: true,
     locked: false,
-    capacity: 100000,
+    capacity: 10000,
     baseLatency: 5,
     baseError: 0.0001,
     health: 1,
@@ -79,7 +79,7 @@ export function createInitialArchitecture(): {
     name: 'CDN',
     enabled: true,
     locked: false,
-    capacity: 50000,
+    capacity: 5000,
     baseLatency: 20,
     baseError: 0.001,
     health: 1,
@@ -117,7 +117,7 @@ export function createInitialArchitecture(): {
     name: 'WAF',
     enabled: true,
     locked: false,
-    capacity: 30000,
+    capacity: 3000,
     baseLatency: 5,
     baseError: 0.001,
     health: 1,
@@ -156,7 +156,7 @@ export function createInitialArchitecture(): {
     name: 'Global LB',
     enabled: true,
     locked: false,
-    capacity: 50000,
+    capacity: 5000,
     baseLatency: 10,
     baseError: 0.0005,
     health: 1,
@@ -192,7 +192,7 @@ export function createInitialArchitecture(): {
     name: 'Regional LB',
     enabled: true,
     locked: false,
-    capacity: 30000,
+    capacity: 3000,
     baseLatency: 5,
     baseError: 0.001,
     health: 1,
@@ -228,7 +228,7 @@ export function createInitialArchitecture(): {
     name: 'API Gateway',
     enabled: true,
     locked: false,
-    capacity: 20000,
+    capacity: 2000,
     baseLatency: 15,
     baseError: 0.002,
     health: 1,
@@ -269,7 +269,7 @@ export function createInitialArchitecture(): {
     name: 'App Cluster',
     enabled: true,
     locked: false,
-    capacity: 5000,
+    capacity: 500,
     baseLatency: 50,
     baseError: 0.005,
     health: 1,
@@ -314,7 +314,7 @@ export function createInitialArchitecture(): {
     name: 'Service Mesh',
     enabled: false,
     locked: true,
-    capacity: 50000,
+    capacity: 5000,
     baseLatency: 3,
     baseError: 0.0001,
     health: 1,
@@ -353,7 +353,7 @@ export function createInitialArchitecture(): {
     name: 'Redis Cache',
     enabled: true,
     locked: false,
-    capacity: 10000,
+    capacity: 1000,
     baseLatency: 2,
     baseError: 0.001,
     health: 1,
@@ -391,7 +391,7 @@ export function createInitialArchitecture(): {
     name: 'Message Queue',
     enabled: true,
     locked: false,
-    capacity: 5000,
+    capacity: 500,
     baseLatency: 10,
     baseError: 0.002,
     health: 1,
@@ -429,7 +429,7 @@ export function createInitialArchitecture(): {
     name: 'Workers',
     enabled: true,
     locked: false,
-    capacity: 2000,
+    capacity: 200,
     baseLatency: 100,
     baseError: 0.01,
     health: 1,
@@ -473,7 +473,7 @@ export function createInitialArchitecture(): {
     name: 'DB Primary',
     enabled: true,
     locked: false,
-    capacity: 3000,
+    capacity: 300,
     baseLatency: 20,
     baseError: 0.003,
     health: 1,
@@ -520,7 +520,7 @@ export function createInitialArchitecture(): {
     name: 'DB Replica',
     enabled: true,
     locked: false,
-    capacity: 1000,
+    capacity: 100,
     baseLatency: 25,
     baseError: 0.003,
     health: 1,
@@ -561,7 +561,7 @@ export function createInitialArchitecture(): {
     name: 'Object Storage',
     enabled: true,
     locked: false,
-    capacity: 10000,
+    capacity: 1000,
     baseLatency: 30,
     baseError: 0.001,
     health: 1,
@@ -600,7 +600,7 @@ export function createInitialArchitecture(): {
     name: 'Observability',
     enabled: true,
     locked: false,
-    capacity: 100000,
+    capacity: 10000,
     baseLatency: 0,
     baseError: 0,
     health: 1,
@@ -709,6 +709,17 @@ export function deployComponent(
     // When WAF is deployed, CDN should route through WAF instead of directly to APP
     architecture.edges = architecture.edges.filter(
       e => !(e.from === 'cdn' && e.to === 'app')
+    );
+  }
+
+  if (componentId === 'cache') {
+    // Cache intercepts 60% of app→DB traffic (cache hit rate ~75%), so only ~25% of
+    // those queries reach the DB. Reduce the app→db_primary edge weight accordingly
+    // so deploying cache visibly relieves database pressure.
+    architecture.edges = architecture.edges.map(e =>
+      e.from === 'app' && e.to === 'db_primary'
+        ? { ...e, weight: e.weight * 0.25 }
+        : e
     );
   }
 

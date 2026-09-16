@@ -184,7 +184,7 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
 
   // === 1. TRAFFIC GENERATION ===
   const activityRate = getActivityRate(newState.hourOfDay, newState.dayOfWeek);
-  const baseRPS = newState.users * activityRate * 0.01; // 1% of users active
+  const baseRPS = newState.users * activityRate * GAME_CONFIG.traffic.rpsPerActiveUser;
   newState.rps = Math.max(0, baseRPS);
 
   // === 2. PROPAGATE LOAD THROUGH ARCHITECTURE ===

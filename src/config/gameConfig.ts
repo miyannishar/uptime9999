@@ -141,6 +141,14 @@ export const GAME_CONFIG = {
     uptimeWindowSize: 300, // 5 minutes
   },
 
+  // === TRAFFIC ===
+  traffic: {
+    // Requests per second contributed by each active user. Tuned so the app cluster
+    // reaches its 0.7 latency knee in the first few minutes at starting capacity,
+    // making the first cache/CDN deployment feel like relief rather than bookkeeping.
+    rpsPerActiveUser: 0.75,
+  },
+
   // === ACTIVITY RATE (time of day) ===
   activity: {
     baselineRate: 0.5,
