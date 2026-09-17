@@ -714,7 +714,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                     <polygon
                       points={`${pos.x + 116},${pos.y + 142} ${pos.x + 130},${pos.y + 162} ${pos.x + 144},${pos.y + 142}`}
                       fill="none"
-                      stroke="var(--status-warn)"
+                      stroke="#f59e0b"
                       strokeWidth={2}
                       opacity={0.8}
                     />
@@ -722,7 +722,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
                       x={pos.x + 130}
                       y={pos.y + 158}
                       textAnchor="middle"
-                      fill="var(--status-warn)"
+                      fill="#f59e0b"
                       fontSize={10}
                       fontFamily="'JetBrains Mono', monospace"
                       fontWeight={700}
