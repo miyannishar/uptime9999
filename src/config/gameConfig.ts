@@ -61,7 +61,9 @@ export const GAME_CONFIG = {
   // === INCIDENT SYSTEM ===
   incidents: {
     // Global scale on template baseRatePerMinute (they sum to ~1.36/min unscaled).
-    spawnRateMultiplier: 0.5,
+    // At 2.0: ~1 eligible incident every 49s early-game, ~27/30min total. Feels active.
+    // At 0.5 (old): 1 every 197s — too slow to feel like anything is happening.
+    spawnRateMultiplier: 1.5,
     maxConcurrent: 6,
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
     // Reputation for a resolved incident. Auto-resolve pays less than acting, so
