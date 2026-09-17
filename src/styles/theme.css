@@ -1566,7 +1566,7 @@ body {
 /* ENH-3: Firefox scrollbar styling */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg-base);
+  scrollbar-color: var(--border-default) var(--bg-base);
 }
 
 /* === VIEW LOGS BUTTON (CSS-4 FIX) === */
