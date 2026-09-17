@@ -59,6 +59,25 @@
   --z-modal:     100;
   --z-alert:     200;
   --z-pager:     300;
+
+  /* ── LEGACY ALIASES ──────────────────────────────────────────────
+     tasks.css and taskHints.css still reference the old variable names.
+     These forward them to the new token system without changing those files. */
+  --accent-cyan:    var(--interactive);
+  --accent-blue:    var(--status-info);
+  --accent-yellow:  var(--status-warn);
+  --accent-pink:    var(--color-danger);
+  --bg-primary:     var(--bg-base);
+  --bg-secondary:   var(--bg-surface);
+  --bg-tertiary:    var(--bg-elevated);
+  --border:         var(--border-default);
+  --good:           var(--status-good);
+  --warning:        var(--status-warn);
+  --critical:       var(--status-crit);
+  --text-primary:   #e8e8f0;
+  --text-secondary: #a0a0b0;
+  --text-muted:     #7a7a90;
+  --shadow:         var(--interactive-glow);
 }
 
 body {
