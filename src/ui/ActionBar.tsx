@@ -1,3 +1,4 @@
+import React from 'react';
 import { GameState } from '../sim/types';
 import { ACTIONS } from '../data/actions';
 import { isActionTargetPresent } from '../sim/actionAvailability';
@@ -66,6 +67,19 @@ export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
     'enable_anycast_dns',
   ];
 
+  const CATEGORY_BREAKS: Record<string, string> = {
+    scale_down_app:          '💲 Cost & Optimize',
+    add_app_instance:        '⬆ Scale',
+    add_db_replica:          '🗄 Database',
+    split_auth_service:      '⚙ Microservices',
+    add_cache_node:          '⚡ Performance',
+    add_apigw_instance:      '🏗 Infrastructure',
+    add_distributed_tracing: '🔭 Observability',
+    enable_autoscaling:      '💰 Cost Automation',
+    add_ddos_protection:     '🛡 Security',
+    add_priority_queue:      '⚙ Advanced',
+  };
+
   const canExecuteAction = (actionId: string): boolean => {
     const action = ACTIONS.find(a => a.id === actionId);
     if (!action) return false;
@@ -87,9 +101,10 @@ export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
   return (
     <div className="action-bar">
       <div className="action-bar-header">
-        <h3>⚡ Quick Actions</h3>
+        <h3>Quick Actions</h3>
       </div>
       <div className="action-bar-buttons">
+        {/* Category headers injected inline before each group */}
         {quickActionIds.map((actionId, idx) => {
           const action = ACTIONS.find(a => a.id === actionId);
           if (!action) return null;
@@ -100,23 +115,28 @@ export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
           const canExecute = canExecuteAction(actionId);
           const cooldown = getCooldownRemaining(actionId);
           const inProgress = state.actionsInProgress.some(a => a.actionId === actionId);
+          const categoryLabel = CATEGORY_BREAKS[actionId];
 
           return (
-            <button
-              key={actionId}
-              className={`quick-action ${!canExecute || cooldown > 0 ? 'disabled' : ''} ${
-                inProgress ? 'in-progress' : ''
-              }`}
-              onClick={() => onExecuteAction(actionId)}
-              disabled={!canExecute || cooldown > 0}
-              title={action.description}
-            >
-              <div className="action-hotkey">{idx + 1}</div>
-              <div className="action-name">{action.name}</div>
-              <div className="action-cost">${action.oneTimeCost}</div>
-              {cooldown > 0 && <div className="action-cooldown">{cooldown}s</div>}
-              {inProgress && <div className="action-progress">⏳</div>}
-            </button>
+            <React.Fragment key={actionId}>
+              {categoryLabel && (
+                <div className="action-category-header">{categoryLabel}</div>
+              )}
+              <button
+                className={`quick-action ${!canExecute || cooldown > 0 ? 'disabled' : ''} ${
+                  inProgress ? 'in-progress' : ''
+                }`}
+                onClick={() => onExecuteAction(actionId)}
+                disabled={!canExecute || cooldown > 0}
+                title={action.description}
+              >
+                <div className="action-hotkey">{idx + 1}</div>
+                <div className="action-name">{action.name}</div>
+                <div className="action-cost">${action.oneTimeCost}</div>
+                {cooldown > 0 && <div className="action-cooldown">{cooldown}s</div>}
+                {inProgress && <span className="action-spinner" aria-label="In progress" />}
+              </button>
+            </React.Fragment>
           );
         })}
       </div>
