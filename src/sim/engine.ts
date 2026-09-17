@@ -1016,12 +1016,11 @@ function updateIncidents(state: GameState, _dt: number) {
     }
   }
   
-  // BREATHER MECHANIC: After resolving incidents, suppress new ones for 30s
-  // BAL-7 FIX: Trigger when no CRIT/WARN remain (ignore lingering INFO incidents)
+  // BREATHER: Only trigger after player-mitigated CRIT/WARN, not auto-resolved INFO
   const hasSeriousIncidents = state.activeIncidents.some(i => i.severity === 'CRIT' || i.severity === 'WARN');
-  if (resolvedThisTick > 0 && !hasSeriousIncidents) {
+  if (mitigatedThisTick > 0 && !hasSeriousIncidents) {
     state.lastCalmPeriodEnd = Date.now() + GAME_CONFIG.session.calmPeriodAfterCritMs;
-    tlog.info(`😌 All clear! 30 second breather before next incident wave.`);
+    tlog.info(`😌 All clear! Breather before next incident wave.`);
   }
 }
 
