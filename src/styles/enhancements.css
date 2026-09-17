@@ -22,7 +22,7 @@
   animation: statusPulse 1.5s ease-in-out infinite;
 }
 .status-page-widget.lying {
-  border-bottom-color: #ef4444;
+  border-bottom-color: var(--status-crit);
 }
 .status-page-icon { font-size: 14px; }
 .status-page-label { color: #c8d6e5; font-weight: 500; }
@@ -195,7 +195,7 @@
   font-size: 14px;
   padding: 2px 4px;
 }
-.stakeholder-dismiss:hover { color: #ef4444; }
+.stakeholder-dismiss:hover { color: var(--status-crit); }
 .stakeholder-body p {
   color: #a0b0c0;
   font-size: 12.5px;
@@ -242,7 +242,7 @@
 }
 .pager-content {
   background: rgba(20, 10, 15, 0.95);
-  border: 2px solid #ef4444;
+  border: 2px solid var(--status-crit);
   border-radius: 16px;
   padding: 32px 40px;
   text-align: center;
@@ -268,7 +268,7 @@
 .pager-alert-text {
   font-size: 22px;
   font-weight: 800;
-  color: #ef4444;
+  color: var(--status-crit);
   letter-spacing: 2px;
   margin: 12px 0 8px;
   text-transform: uppercase;
@@ -297,7 +297,7 @@
 }
 .pager-countdown-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ef4444, #f97316);
+  background: linear-gradient(90deg, var(--status-crit), #f97316);
   border-radius: 3px;
   transition: width 1s linear;
 }
@@ -307,7 +307,7 @@
   color: #eab308;
 }
 .pager-ack-button {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: linear-gradient(135deg, var(--status-crit), #dc2626);
   color: #fff;
   border: none;
   padding: 14px 36px;
@@ -349,7 +349,7 @@
 }
 .postmortem-severity.severity-crit {
   background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: var(--status-crit);
 }
 .postmortem-severity.severity-warn {
   background: rgba(234, 179, 8, 0.2);
@@ -390,9 +390,9 @@
   height: 10px;
   border-radius: 50%;
 }
-.timeline-dot.detected { background: #ef4444; }
-.timeline-dot.resolved { background: #22c55e; }
-.timeline-dot.duration { background: #3b82f6; }
+.timeline-dot.detected { background: var(--status-crit); }
+.timeline-dot.resolved { background: var(--status-good); }
+.timeline-dot.duration { background: var(--status-info); }
 .timeline-label { color: #8899aa; }
 .timeline-time { color: #c8d6e5; font-weight: 600; }
 
@@ -425,7 +425,7 @@
   font-weight: 700;
   color: #c8d6e5;
 }
-.impact-value.negative { color: #ef4444; }
+.impact-value.negative { color: var(--status-crit); }
 
 /* Action Items */
 .postmortem-actions { margin-bottom: 16px; }
@@ -463,7 +463,7 @@
 }
 .action-item-benefit {
   font-size: 11px;
-  color: #22c55e;
+  color: var(--status-good);
   background: rgba(34, 197, 94, 0.1);
   padding: 2px 8px;
   border-radius: 4px;
@@ -476,7 +476,7 @@
 .action-item-adopt-btn {
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #22c55e;
+  color: var(--status-good);
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -588,7 +588,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #22c55e;
+  background: var(--status-good);
 }
 .timeline-now-label {
   position: absolute;
@@ -596,7 +596,7 @@
   left: 4px;
   font-size: 9px;
   font-weight: 700;
-  color: #22c55e;
+  color: var(--status-good);
 }
 
 /* === Achievement Toast === */
@@ -640,7 +640,7 @@
 .achievement-toast-title {
   font-size: 11px;
   font-weight: 700;
-  color: #a78bfa;
+  color: var(--color-ai);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -757,7 +757,7 @@
   transition: all 0.2s;
 }
 .modal-button.primary {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, var(--status-info), #2563eb);
   color: #fff;
 }
 .modal-button.primary:hover {
