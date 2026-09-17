@@ -1,0 +1,355 @@
+{
+  "TERMINAL_TEMPLATES": {
+    "COMPUTE": [
+      { "prompt": "Restart the app deployment to clear the incident", "command": "kubectl rollout restart deployment/", "placeholder": "deployment-name", "completion": "uptime9999-app" },
+      { "prompt": "Force-kill the OOM process to free memory", "command": "kill -9 ", "placeholder": "PID", "completion": "$(pgrep -f uptime9999)" },
+      { "prompt": "Check which process is consuming the most CPU", "command": "ps aux --sort=-%cpu | head -", "placeholder": "N", "completion": "10" },
+      { "prompt": "Scale up app replicas to handle the load", "command": "kubectl scale deployment/uptime9999-app --replicas=", "placeholder": "N", "completion": "5" },
+      { "prompt": "Clear the node disk to free space", "command": "find /var/log -name \"*.log\" -mtime +7 -delete && df -h /", "placeholder": "", "completion": "" }
+    ],
+    "DATABASE": [
+      { "prompt": "Restart the PostgreSQL service", "command": "systemctl restart ", "placeholder": "service", "completion": "postgresql" },
+      { "prompt": "Kill all idle connections to the database", "command": "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = 'idle' AND pid <> pg_backend_pid();\" ", "placeholder": "db", "completion": "uptime9999" },
+      { "prompt": "Check how many connections are currently open", "command": "psql -c \"SELECT count(*) FROM pg_stat_activity WHERE datname = '", "placeholder": "db';\"", "completion": "uptime9999';\"" },
+      { "prompt": "Rebuild corrupted table statistics", "command": "psql -c \"ANALYZE VERBOSE ", "placeholder": "table;\"", "completion": "users;\"" },
+      { "prompt": "Flush query plan cache to fix stale plans", "command": "psql -c \"SELECT pg_stat_reset_shared('", "placeholder": "object';\"", "completion": "bgwriter';\"" }
+    ],
+    "CACHE": [
+      { "prompt": "Flush the Redis cache to clear corrupt data", "command": "redis-cli -h redis ", "placeholder": "command", "completion": "FLUSHDB" },
+      { "prompt": "Restart the Redis service", "command": "systemctl restart ", "placeholder": "service", "completion": "redis" },
+      { "prompt": "Check Redis memory usage", "command": "redis-cli -h redis INFO memory | grep used_memory_human | cut -d: -f", "placeholder": "N", "completion": "2" },
+      { "prompt": "Set a memory limit on the Redis instance", "command": "redis-cli -h redis CONFIG SET maxmemory ", "placeholder": "size", "completion": "4gb" },
+      { "prompt": "Count keys in the cache to check bloat", "command": "redis-cli -h redis DBSIZE && redis-cli -h redis INFO keyspace | grep db", "placeholder": "N", "completion": "0" }
+    ],
+    "QUEUE": [
+      { "prompt": "Restart the queue consumer workers", "command": "supervisorctl restart ", "placeholder": "worker", "completion": "rq-worker:*" },
+      { "prompt": "Check queue depth for the main queue", "command": "redis-cli -h redis LLEN ", "placeholder": "queue-name", "completion": "rq:queue:default" },
+      { "prompt": "Purge dead-letter queue to remove poison messages", "command": "redis-cli -h redis DEL ", "placeholder": "queue-name", "completion": "rq:queue:failed" },
+      { "prompt": "Scale up worker processes", "command": "kubectl scale deployment/rq-worker --replicas=", "placeholder": "N", "completion": "8" },
+      { "prompt": "Kill stuck worker process", "command": "kill -9 $(pgrep -f ", "placeholder": "process-name)", "completion": "rq-worker)" }
+    ],
+    "WORKERS": [
+      { "prompt": "Restart stuck background workers", "command": "supervisorctl restart all && supervisorctl status | grep ", "placeholder": "service", "completion": "RUNNING" },
+      { "prompt": "Check worker process memory usage", "command": "ps -eo pid,ppid,%mem,%cpu,cmd | grep worker | grep -v grep | sort -k3 -r | head -", "placeholder": "N", "completion": "5" },
+      { "prompt": "Kill zombie worker processes", "command": "ps aux | awk '$8==\"Z\" {print $2}' | xargs kill -", "placeholder": "signal", "completion": "9" },
+      { "prompt": "Scale up worker fleet", "command": "kubectl scale deployment/worker --replicas=", "placeholder": "N", "completion": "10" },
+      { "prompt": "Check job failure rate in last hour", "command": "redis-cli -h redis LLEN rq:queue:failed && echo \"jobs failed in last hour:\"", "placeholder": "", "completion": "" }
+    ],
+    "DNS": [
+      { "prompt": "Flush the local DNS cache", "command": "systemd-resolve --flush-caches && systemd-resolve --statistics | grep ", "placeholder": "field", "completion": "Cache" },
+      { "prompt": "Verify DNS resolution for the API endpoint", "command": "dig +short ", "placeholder": "domain", "completion": "api.uptime9999.io" },
+      { "prompt": "Check TTL on the main domain", "command": "dig +nocmd +noall +answer ", "placeholder": "domain", "completion": "api.uptime9999.io" },
+      { "prompt": "Force DNS re-propagation via secondary nameserver", "command": "dig @8.8.8.8 +short ", "placeholder": "domain", "completion": "api.uptime9999.io" },
+      { "prompt": "Test DNSSEC validation", "command": "delv +rtrace ", "placeholder": "domain", "completion": "api.uptime9999.io" }
+    ],
+    "CDN": [
+      { "prompt": "Purge the CDN cache for stale assets", "command": "curl -X PURGE https://cdn.uptime9999.io/", "placeholder": "path", "completion": "static/assets" },
+      { "prompt": "Force cache revalidation on the CDN", "command": "curl -H \"Cache-Control: no-cache\" -I https://cdn.uptime9999.io/", "placeholder": "path", "completion": "index.html" },
+      { "prompt": "Check CDN cache hit rate via curl headers", "command": "curl -sI https://cdn.uptime9999.io/ | grep -i ", "placeholder": "header", "completion": "x-cache" },
+      { "prompt": "Prefetch critical assets to warm the cache", "command": "curl -s https://cdn.uptime9999.io/", "placeholder": "asset-path", "completion": "static/app.js" },
+      { "prompt": "Invalidate the CDN edge cache globally", "command": "aws cloudfront create-invalidation --distribution-id DIST123 --paths \"/", "placeholder": "path*\"", "completion": "*\"" }
+    ],
+    "STORAGE": [
+      { "prompt": "Free disk space by removing old logs", "command": "find /var/log -name \"*.log\" -mtime +", "placeholder": "days", "completion": "7" },
+      { "prompt": "Check disk usage by directory", "command": "du -sh /* 2>/dev/null | sort -rh | head -", "placeholder": "N", "completion": "10" },
+      { "prompt": "Verify storage service health", "command": "aws s3 ls s3://uptime9999-storage/ | wc -", "placeholder": "count", "completion": "l" },
+      { "prompt": "Compress old log archives to save space", "command": "gzip -r /var/log/app/archive/", "placeholder": "", "completion": "" },
+      { "prompt": "Move logs to cold storage", "command": "aws s3 mv /var/log/app/old/ s3://uptime9999-cold-storage/ --recursive --storage-class ", "placeholder": "class", "completion": "GLACIER" }
+    ],
+    "DEPLOY": [
+      { "prompt": "Roll back to the previous deployment", "command": "kubectl rollout undo deployment/", "placeholder": "deployment-name", "completion": "uptime9999-app" },
+      { "prompt": "Check rollout status", "command": "kubectl rollout status deployment/", "placeholder": "deployment-name", "completion": "uptime9999-app" },
+      { "prompt": "Force image pull and redeploy", "command": "kubectl rollout restart deployment/", "placeholder": "deployment-name", "completion": "uptime9999-app" },
+      { "prompt": "Pin the deployment to a known-good image", "command": "kubectl set image deployment/app app=uptime9999:", "placeholder": "image-tag", "completion": "v2.4.1-stable" },
+      { "prompt": "Check which version is currently running", "command": "kubectl get deployment uptime9999-app -o jsonpath='{.spec.template.spec.containers[0].image}' && echo \"\"", "placeholder": "", "completion": "" }
+    ],
+    "DEFAULT": [
+      { "prompt": "Apply the fix and verify the service is healthy", "command": "kubectl rollout restart deployment/", "placeholder": "service-name", "completion": "uptime9999-app" },
+      { "prompt": "Check service logs for recent errors", "command": "kubectl logs deployment/uptime9999-app --since=", "placeholder": "time", "completion": "5m" },
+      { "prompt": "Verify service endpoints are reachable", "command": "curl -sf https://api.uptime9999.io/health && echo ", "placeholder": "msg", "completion": "\"OK\"" },
+      { "prompt": "Force pod replacement to clear the issue", "command": "kubectl delete pod -l app=", "placeholder": "label", "completion": "uptime9999-app" },
+      { "prompt": "Scale the deployment to trigger rolling update", "command": "kubectl rollout restart deployment/", "placeholder": "app", "completion": "uptime9999-app" }
+    ]
+  },
+  "CONFIG_TEMPLATES": [
+    { "filename": "redis.conf", "key": "maxmemory-policy", "cur": "noeviction", "target": "allkeys-lru", "content": "# Redis Configuration\nbind 0.0.0.0\nport 6379\nmaxmemory 8gb\nmaxmemory-policy noeviction\nsave 900 1\ntimeout 300\ntcp-keepalive 60" },
+    { "filename": "redis.conf", "key": "maxmemory", "cur": "4gb", "target": "8gb", "content": "# Redis Configuration\nbind 0.0.0.0\nport 6379\nmaxmemory 4gb\nmaxmemory-policy allkeys-lru\nsave 900 1\ntimeout 300" },
+    { "filename": "redis.conf", "key": "timeout", "cur": "300", "target": "600", "content": "# Redis Configuration\nbind 0.0.0.0\nport 6379\nmaxmemory 8gb\nmaxmemory-policy allkeys-lru\nsave 900 1\ntimeout 300\ntcp-keepalive 60" },
+    { "filename": "postgresql.conf", "key": "max_connections", "cur": "100", "target": "200", "content": "# PostgreSQL Configuration\nlisten_addresses = '*'\nport = 5432\nmax_connections = 100\nshared_buffers = 256MB\nwork_mem = 4MB\neffective_cache_size = 1GB" },
+    { "filename": "postgresql.conf", "key": "shared_buffers", "cur": "256MB", "target": "512MB", "content": "# PostgreSQL Configuration\nlisten_addresses = '*'\nport = 5432\nmax_connections = 150\nshared_buffers = 256MB\nwork_mem = 8MB\neffective_cache_size = 2GB" },
+    { "filename": "postgresql.conf", "key": "work_mem", "cur": "4MB", "target": "16MB", "content": "# PostgreSQL Configuration\nlisten_addresses = '*'\nport = 5432\nmax_connections = 200\nshared_buffers = 512MB\nwork_mem = 4MB\neffective_cache_size = 2GB" },
+    { "filename": "nginx.conf", "key": "worker_connections", "cur": "1024", "target": "4096", "content": "events {\n  worker_processes auto;\n  worker_connections 1024;\n}\nhttp {\n  keepalive_timeout 65;\n  client_max_body_size 20M;\n  gzip on;\n}" },
+    { "filename": "nginx.conf", "key": "keepalive_timeout", "cur": "65", "target": "30", "content": "events {\n  worker_processes auto;\n  worker_connections 4096;\n}\nhttp {\n  keepalive_timeout 65;\n  client_max_body_size 20M;\n  gzip on;\n}" },
+    { "filename": "app.yaml", "key": "max_pool_size", "cur": "5", "target": "20", "content": "database:\n  host: db-primary.internal\n  port: 5432\n  max_pool_size: 5\n  min_pool_size: 2\n  pool_timeout: 30\n  idle_timeout: 600" },
+    { "filename": "app.yaml", "key": "pool_timeout", "cur": "30", "target": "10", "content": "database:\n  host: db-primary.internal\n  port: 5432\n  max_pool_size: 20\n  min_pool_size: 5\n  pool_timeout: 30\n  idle_timeout: 600" },
+    { "filename": "app.yaml", "key": "log_level", "cur": "DEBUG", "target": "WARN", "content": "server:\n  host: 0.0.0.0\n  port: 8080\n  workers: 4\n  timeout: 30\nlogging:\n  log_level: DEBUG\n  format: json\n  output: /var/log/app.log" },
+    { "filename": "haproxy.cfg", "key": "maxconn", "cur": "2000", "target": "10000", "content": "global\n  maxconn 2000\n  log /dev/log local0\ndefaults\n  mode http\n  timeout connect 5000ms\n  timeout client 50000ms\n  timeout server 50000ms" },
+    { "filename": "rabbitmq.conf", "key": "vm_memory_high_watermark", "cur": "0.4", "target": "0.6", "content": "## RabbitMQ Configuration\nlisteners.tcp.default = 5672\nmanagement.listener.port = 15672\nvm_memory_high_watermark = 0.4\ndisk_free_limit.absolute = 2GB" },
+    { "filename": "celery.conf", "key": "worker_concurrency", "cur": "4", "target": "16", "content": "[celery]\nbroker_url = redis://redis:6379/0\nresult_backend = redis://redis:6379/1\nworker_concurrency = 4\ntask_soft_time_limit = 300\ntask_time_limit = 600" },
+    { "filename": "prometheus.yml", "key": "scrape_interval", "cur": "15s", "target": "30s", "content": "global:\n  scrape_interval: 15s\n  evaluation_interval: 15s\nrule_files:\n  - \"alerts/*.yml\"\nscrape_configs:\n  - job_name: uptime9999\n    static_configs:\n      - targets: ['app:9090']" }
+  ],
+  "CODE_TEMPLATES": [
+    {
+      "filename": "queries.py",
+      "code": "def get_user_activity(user_id):\n    return db.execute(\n        \"SELECT * FROM events WHERE user_id = %s\",\n        (user_id,)\n    ).fetchall()",
+      "issue": "Slow query — fetching all columns",
+      "bugPattern": "SELECT *",
+      "expectedFix": "SELECT id, type, created_at FROM events WHERE user_id = %s ORDER BY created_at DESC LIMIT 100",
+      "fixHint": "Select only needed columns and add LIMIT 100"
+    },
+    {
+      "filename": "db.js",
+      "code": "async function getOrders(userId) {\n  const user = await db.users.findById(userId);\n  const orders = [];\n  for (const orderId of user.orderIds) {\n    orders.push(await db.orders.findById(orderId));\n  }\n  return orders;\n}",
+      "issue": "N+1 query — fetches orders one-by-one",
+      "bugPattern": "for (const orderId of user.orderIds)",
+      "expectedFix": "return db.orders.find({ userId })",
+      "fixHint": "Replace the loop with a single findAll query using userId"
+    },
+    {
+      "filename": "cache.py",
+      "code": "def get_product(product_id):\n    # Check cache\n    cached = redis.get(f\"product:{product_id}\")\n    if cached:\n        return json.loads(cached)\n    product = db.products.find_one({\"_id\": product_id})\n    redis.set(f\"product:{product_id}\", json.dumps(product))\n    return product",
+      "issue": "Cache set with no TTL — keys never expire",
+      "bugPattern": "redis.set(f\"product:{product_id}\", json.dumps(product))",
+      "expectedFix": "redis.setex(f\"product:{product_id}\", 3600, json.dumps(product))",
+      "fixHint": "Use setex with a 3600 second (1 hour) TTL"
+    },
+    {
+      "filename": "connection.js",
+      "code": "app.get('/api/data', async (req, res) => {\n  const conn = await db.connect();\n  const result = await conn.query('SELECT * FROM metrics');\n  res.json(result.rows);\n});\n// connection never closed!",
+      "issue": "Connection leak — pool exhaustion",
+      "bugPattern": "// connection never closed!",
+      "expectedFix": "try { result = await conn.query(...); } finally { conn.release(); }",
+      "fixHint": "Add try/finally block to release the connection after use"
+    },
+    {
+      "filename": "retry.py",
+      "code": "def call_external_api(url):\n    response = requests.get(url, timeout=5)\n    return response.json()",
+      "issue": "No retry logic — single failure causes error",
+      "bugPattern": "response = requests.get(url, timeout=5)",
+      "expectedFix": "for attempt in range(3):\n    try:\n        return requests.get(url, timeout=5).json()\n    except Exception:\n        if attempt == 2: raise\n        time.sleep(2 ** attempt)",
+      "fixHint": "Add exponential backoff retry (3 attempts, 1s/2s/4s)"
+    },
+    {
+      "filename": "batch.py",
+      "code": "def process_events(events):\n    for event in events:\n        db.execute(\"INSERT INTO processed (data) VALUES (%s)\", (event,))\n        db.commit()",
+      "issue": "Committing inside loop — massive write amplification",
+      "bugPattern": "db.commit()",
+      "expectedFix": "db.executemany(\"INSERT INTO processed (data) VALUES (%s)\", [(e,) for e in events])\ndb.commit()",
+      "fixHint": "Move commit outside the loop and use executemany for batch insert"
+    },
+    {
+      "filename": "worker.js",
+      "code": "async function processJob(job) {\n  const data = await fetch(job.url).then(r => r.json());\n  await saveToDb(data);\n  await sendNotification(data);\n  await updateStats(data);\n}",
+      "issue": "Sequential async calls that could run in parallel",
+      "bugPattern": "await saveToDb(data);\n  await sendNotification(data);\n  await updateStats(data);",
+      "expectedFix": "await Promise.all([saveToDb(data), sendNotification(data), updateStats(data)]);",
+      "fixHint": "Use Promise.all to run independent async operations in parallel"
+    },
+    {
+      "filename": "index.js",
+      "code": "const results = [];\nfor (const id of userIds) {\n  const user = await getUserFromDB(id);\n  results.push(user);\n}",
+      "issue": "Sequential DB calls inside a loop",
+      "bugPattern": "for (const id of userIds) {",
+      "expectedFix": "const results = await Promise.all(userIds.map(id => getUserFromDB(id)));",
+      "fixHint": "Replace the sequential loop with Promise.all for parallel fetching"
+    }
+  ],
+  "BUTTON_SEQUENCE_TEMPLATES": [
+    {
+      "title": "Emergency Deploy Rollback",
+      "description": "Roll back the bad deployment safely",
+      "steps": [
+        { "label": "Check current version", "buttonText": "kubectl get deployment uptime9999-app -o jsonpath='{.spec.template.spec.containers[0].image}'", "correct": true },
+        { "label": "Roll back", "buttonText": "kubectl rollout undo deployment/uptime9999-app", "correct": true },
+        { "label": "Verify rollback", "buttonText": "kubectl rollout status deployment/uptime9999-app", "correct": true },
+        { "label": "Skip verification", "buttonText": "close the incident immediately", "correct": false }
+      ]
+    },
+    {
+      "title": "Database Failover Procedure",
+      "description": "Promote replica to primary safely",
+      "steps": [
+        { "label": "Stop writes to primary", "buttonText": "psql primary -c \"ALTER SYSTEM SET default_transaction_read_only = on; SELECT pg_reload_conf();\"", "correct": true },
+        { "label": "Promote replica", "buttonText": "pg_ctl promote -D /var/lib/postgresql/data", "correct": true },
+        { "label": "Update connection string", "buttonText": "kubectl set env deployment/app DATABASE_URL=postgresql://db-replica:5432/uptime9999", "correct": true },
+        { "label": "Promote without stopping writes", "buttonText": "pg_ctl promote immediately", "correct": false }
+      ]
+    },
+    {
+      "title": "Incident Response Runbook",
+      "description": "Follow the correct incident response steps",
+      "steps": [
+        { "label": "Acknowledge the incident", "buttonText": "ack incident in PagerDuty + post in #incidents Slack", "correct": true },
+        { "label": "Assess impact", "buttonText": "check error rate dashboard + affected user count", "correct": true },
+        { "label": "Apply hotfix", "buttonText": "kubectl rollout restart deployment/uptime9999-app", "correct": true },
+        { "label": "Close without notifying users", "buttonText": "mark resolved, skip status page update", "correct": false }
+      ]
+    },
+    {
+      "title": "Memory Leak Remediation",
+      "description": "Resolve OOM without data loss",
+      "steps": [
+        { "label": "Identify leaking process", "buttonText": "ps aux --sort=-%mem | head -10", "correct": true },
+        { "label": "Graceful restart", "buttonText": "kubectl rollout restart deployment/uptime9999-app", "correct": true },
+        { "label": "Verify recovery", "buttonText": "kubectl top pods | grep uptime9999", "correct": true },
+        { "label": "Kill -9 all processes", "buttonText": "pkill -9 -f uptime9999", "correct": false }
+      ]
+    },
+    {
+      "title": "DDoS Mitigation Procedure",
+      "description": "Block attack traffic without impacting legitimate users",
+      "steps": [
+        { "label": "Identify attack pattern", "buttonText": "grep \"$(date +%H:%M)\" /var/log/nginx/access.log | awk '{print $1}' | sort | uniq -c | sort -rn | head -20", "correct": true },
+        { "label": "Block attack IPs", "buttonText": "for ip in $(cat attack_ips.txt); do iptables -A INPUT -s $ip -j DROP; done", "correct": true },
+        { "label": "Enable rate limiting", "buttonText": "kubectl apply -f rate-limit-config.yaml", "correct": true },
+        { "label": "Take the entire site offline", "buttonText": "kubectl scale deployment/uptime9999-app --replicas=0", "correct": false }
+      ]
+    },
+    {
+      "title": "Cache Stampede Recovery",
+      "description": "Restore cache health after stampede",
+      "steps": [
+        { "label": "Enable request coalescing", "buttonText": "redis-cli CONFIG SET hz 100", "correct": true },
+        { "label": "Warm critical cache keys", "buttonText": "python manage.py warm_cache --keys=hot_products,featured_users", "correct": true },
+        { "label": "Restore TTLs", "buttonText": "redis-cli SCAN 0 MATCH \"product:*\" COUNT 100 | xargs -I{} redis-cli EXPIRE {} 3600", "correct": true },
+        { "label": "Delete all cache keys and start fresh", "buttonText": "redis-cli FLUSHALL", "correct": false }
+      ]
+    },
+    {
+      "title": "Kubernetes Node Recovery",
+      "description": "Recover from node failure safely",
+      "steps": [
+        { "label": "Cordon the failing node", "buttonText": "kubectl cordon node-$(hostname -s)", "correct": true },
+        { "label": "Drain workloads", "buttonText": "kubectl drain node-$(hostname -s) --ignore-daemonsets --delete-emptydir-data", "correct": true },
+        { "label": "Replace node", "buttonText": "terraform apply -target=aws_instance.worker_node -auto-approve", "correct": true },
+        { "label": "Force delete all pods on node", "buttonText": "kubectl delete pod --all --field-selector=spec.nodeName=node-$(hostname -s) --force", "correct": false }
+      ]
+    }
+  ],
+  "MULTI_CHOICE_TEMPLATES": [
+    {
+      "question": "DDoS attack detected. What is the FIRST action to take?",
+      "options": [
+        { "id": "a", "text": "Enable WAF rate limiting and geo-blocking to filter malicious traffic", "correct": true },
+        { "id": "b", "text": "Scale up all app servers to absorb the attack traffic", "correct": false },
+        { "id": "c", "text": "Take the site offline until the attack stops", "correct": false }
+      ]
+    },
+    {
+      "question": "Credential leak detected in logs. Best immediate response?",
+      "options": [
+        { "id": "a", "text": "Rotate all affected credentials and revoke active sessions immediately", "correct": true },
+        { "id": "b", "text": "Wait for the security team to investigate before acting", "correct": false },
+        { "id": "c", "text": "Block the IP that accessed the leaked credentials", "correct": false }
+      ]
+    },
+    {
+      "question": "Traffic spike is 3× normal. App utilization is at 95%. Best action?",
+      "options": [
+        { "id": "a", "text": "Enable autoscaling and add 3 more app instances to absorb load", "correct": true },
+        { "id": "b", "text": "Enable maintenance mode to reduce traffic", "correct": false },
+        { "id": "c", "text": "Increase database connections to handle the extra queries", "correct": false }
+      ]
+    },
+    {
+      "question": "DB replica lag is 45 seconds and rising. What causes this and how do you fix it?",
+      "options": [
+        { "id": "a", "text": "Primary is under write-heavy load — tune max_wal_senders and replication slots", "correct": true },
+        { "id": "b", "text": "Network partition between primary and replica — restart both servers", "correct": false },
+        { "id": "c", "text": "Replica is out of disk space — promote it to primary immediately", "correct": false }
+      ]
+    },
+    {
+      "question": "Cache hit rate dropped from 85% to 40%. Most likely cause?",
+      "options": [
+        { "id": "a", "text": "Cache TTLs are too short or a noisy-neighbour is evicting hot keys via LRU", "correct": true },
+        { "id": "b", "text": "Too many concurrent reads are overwhelming the cache server", "correct": false },
+        { "id": "c", "text": "The application is not sending the correct cache headers", "correct": false }
+      ]
+    },
+    {
+      "question": "Workers are consuming jobs but results are never saved. Root cause?",
+      "options": [
+        { "id": "a", "text": "DB connection pool exhausted — workers acquire a connection but it times out before commit", "correct": true },
+        { "id": "b", "text": "Queue is full — jobs are being dropped before workers pick them up", "correct": false },
+        { "id": "c", "text": "Worker memory limit reached — jobs are silently killed mid-execution", "correct": false }
+      ]
+    },
+    {
+      "question": "SSL certificate expires in 2 hours and auto-renewal failed. Best response?",
+      "options": [
+        { "id": "a", "text": "Issue an emergency cert via certbot --force-renewal and deploy it immediately", "correct": true },
+        { "id": "b", "text": "Temporarily disable HTTPS and serve over HTTP until the issue is resolved", "correct": false },
+        { "id": "c", "text": "Wait for auto-renewal to retry in 6 hours as per the renewal schedule", "correct": false }
+      ]
+    },
+    {
+      "question": "API gateway is returning 502 errors. What do you check first?",
+      "options": [
+        { "id": "a", "text": "Check if upstream app servers are healthy — 502 means gateway cannot reach them", "correct": true },
+        { "id": "b", "text": "Restart the API gateway itself — it likely has a configuration error", "correct": false },
+        { "id": "c", "text": "Check client-side rate limiting — clients may be sending malformed requests", "correct": false }
+      ]
+    },
+    {
+      "question": "Disk is at 98% on the primary database server. What should you NOT do first?",
+      "options": [
+        { "id": "a", "text": "Delete the database data directory to free space immediately", "correct": true },
+        { "id": "b", "text": "Identify and remove old WAL segments and archive logs safely", "correct": false },
+        { "id": "c", "text": "Move the largest tables to a separate volume via tablespace", "correct": false }
+      ]
+    },
+    {
+      "question": "A single Kubernetes pod is in CrashLoopBackOff. Fastest diagnostic step?",
+      "options": [
+        { "id": "a", "text": "kubectl logs <pod-name> --previous to see the crash reason before restart", "correct": true },
+        { "id": "b", "text": "kubectl delete pod <pod-name> to force a clean restart", "correct": false },
+        { "id": "c", "text": "kubectl describe node to check if the node has resource pressure", "correct": false }
+      ]
+    }
+  ],
+  "LOG_TARGETS": [
+    "OOM killer invoked — process uptime9999 killed",
+    "FATAL: connection pool exhausted (max_connections=100)",
+    "SSL_ERROR_HANDSHAKE_FAILURE: certificate expired",
+    "Replication lag exceeded 30s threshold",
+    "Redis ENOMEM: maxmemory-policy noeviction prevents eviction",
+    "DNS lookup timeout after 5000ms for api.upstream.io",
+    "Worker SIGKILL after exceeding 512MB memory limit",
+    "Circuit breaker OPEN: 10/10 requests failed in 60s window",
+    "Slow query (8432ms): SELECT * FROM events WHERE user_id=1234",
+    "HTTP 503 from upstream — health check failed for 3 consecutive attempts"
+  ],
+  "MONITOR_TEMPLATES": [
+    {
+      "title": "Watch for DB Connection Spike",
+      "description": "Connections are climbing — click when they reach the danger zone",
+      "metrics": [{ "name": "DB Connections", "current": 45, "target": 80, "unit": "", "threshold": "above" }]
+    },
+    {
+      "title": "Memory Pressure Monitor",
+      "description": "App memory is rising due to the leak — click when it crosses 85%",
+      "metrics": [{ "name": "App Memory", "current": 62, "target": 85, "unit": "%", "threshold": "above" }]
+    },
+    {
+      "title": "Cache Hit Rate Recovery",
+      "description": "Cache hit rate is recovering — click when it stabilises above 75%",
+      "metrics": [{ "name": "Cache Hit Rate", "current": 48, "target": 75, "unit": "%", "threshold": "above" }]
+    },
+    {
+      "title": "Error Rate Subsiding",
+      "description": "Error rate should drop after your fix — click when it goes below 1%",
+      "metrics": [{ "name": "Error Rate", "current": 8, "target": 1, "unit": "%", "threshold": "below" }]
+    },
+    {
+      "title": "Queue Drain Monitor",
+      "description": "Watch the queue drain after scaling workers — click when backlog hits zero",
+      "metrics": [{ "name": "Queue Backlog", "current": 450, "target": 10, "unit": "jobs", "threshold": "below" }]
+    },
+    {
+      "title": "CPU Normalisation",
+      "description": "CPU should normalise after restart — click when it drops below 60%",
+      "metrics": [{ "name": "App CPU", "current": 92, "target": 60, "unit": "%", "threshold": "below" }]
+    }
+  ]
+}
