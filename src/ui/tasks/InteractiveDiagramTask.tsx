@@ -177,7 +177,7 @@ export default function InteractiveDiagramTask({
       {error && <div className="task-error">{error}</div>}
 
       <div className="task-hint">
-        <p>💡 Click on the highlighted components to fix them</p>
+        <p>Click on the highlighted components to fix them</p>
       </div>
     </div>
   );
