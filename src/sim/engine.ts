@@ -346,7 +346,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
   );
 
   // First pass: collect all effects
-  for (const incident of state.activeIncidents) {
+  for (const incident of [...state.activeIncidents]) {
     // Handle AI-generated incidents
     if (incident.aiGenerated) {
       const targetNode = nodes.get(incident.targetNodeId);
@@ -503,7 +503,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
         const escalatedDef = INCIDENTS.find(i => i.id === incidentDef.escalatesTo);
         if (escalatedDef) {
           state.activeIncidents.push({
-            id: `incident_${Date.now()}_${Math.random()}`,
+            id: `esc_${incidentDef.escalatesTo}_${state.elapsedSim.toFixed(1)}`,
             definitionId: escalatedDef.id,
             targetNodeId: incident.targetNodeId,
             severity: escalatedDef.severity,

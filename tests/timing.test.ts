@@ -25,6 +25,6 @@ describe('timing', () => {
   it('sizes the uptime window to the configured number of seconds', () => {
     const s = createInitialState('u');
     expect(s.uptimeWindow.length)
-      .toBe(Math.round(GAME_CONFIG.simulation.uptimeWindowSeconds / 0.1));
+      .toBe(Math.round(GAME_CONFIG.simulation.uptimeWindowSeconds / GAME_CONFIG.simulation.tickSeconds));
   });
 });
