@@ -418,15 +418,24 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
             const toNode = nodes.get(edge.to);
             if (!fromNode?.enabled || !toNode?.enabled) return null;
 
+            // Edge load: derived from fromNode utilization and edge weight
+            const edgeLoad = Math.min(1, (fromNode.utilization ?? 0) * edge.weight);
+            const edgeColor = edgeLoad > 0.8 ? 'rgba(255,51,102,0.7)'
+                            : edgeLoad > 0.5 ? 'rgba(255,170,0,0.6)'
+                            : edgeLoad > 0.2 ? 'rgba(0,255,170,0.45)'
+                            : 'rgba(0,255,170,0.18)';
+            const edgeWidth = Math.max(1.5, Math.min(5, 1.5 + edgeLoad * 3.5));
+
             return (
               <g key={`edge-${idx}`}>
                 <path
                   d={`M${from.x + 120},${from.y + 80} L${to.x + 120},${to.y + 80}`}
-                  stroke="rgba(0,217,151,0.25)"
-                  strokeWidth="2"
-                  strokeDasharray="6,6"
+                  stroke={edgeColor}
+                  strokeWidth={edgeWidth}
+                  strokeDasharray={edgeLoad > 0.5 ? 'none' : '6,6'}
                   markerEnd="url(#arrow)"
                   fill="none"
+                  className={edgeLoad > 0.8 ? 'edge-overloaded' : ''}
                 />
               </g>
             );

@@ -28,8 +28,9 @@ import { spawnFromTemplates } from './incidentSpawner';
 
 // Starter incidents seeded from the run seed so different runs open on different problems.
 // Using two WARN starters makes the game feel alive immediately without overwhelming the player.
-const STARTER_POOL = ['slow_queries', 'canary_failure', 'config_drift', 'third_party_api_slow',
-                      'node_reboot', 'memory_leak', 'cloud_region_brownout'];
+// INFO incidents: visible in the feed but no health decay — they don't collapse the early game
+const STARTER_POOL = ['dns_propagation_delay', 'db_backup_failure', 'scraper_attack',
+                      'gdpr_data_request', 'chaos_monkey', 'gameday_drill'];
 
 function buildStarterIncidents(seed: string, startTime: number) {
   const rng = new SeededRNG(seed + '-starters');
@@ -44,8 +45,9 @@ function buildStarterIncidents(seed: string, startTime: number) {
     const def = INCIDENTS.find(d => d.id === defId);
     // Target the appropriate starting node for this incident
     const targetMap: Record<string, string> = {
-      slow_queries: 'db_primary', memory_leak: 'app', cloud_region_brownout: 'app',
-      canary_failure: 'app', config_drift: 'app', third_party_api_slow: 'app', node_reboot: 'app',
+      dns_propagation_delay: 'dns', db_backup_failure: 'db_primary',
+      scraper_attack: 'app', gdpr_data_request: 'app',
+      chaos_monkey: 'app', gameday_drill: 'app',
     };
     return {
       id: `starter_${defId}_${i}`,
@@ -56,9 +58,9 @@ function buildStarterIncidents(seed: string, startTime: number) {
       startSim: 0,
       escalationTimer: def?.escalationTimeSeconds ?? 0,
       outagetimer: 0,
-      // Partially mitigated so escalation check (mitigationLevel < 0.1) stays false
-      mitigationLevel: 0.15,
-      mitigationProgress: 0.15,
+      // Partially mitigated: escalation needs < 0.1, and these are already in progress
+      mitigationLevel: 0.3,
+      mitigationProgress: 0.3,
     };
   });
 }
@@ -316,11 +318,9 @@ function propagateLoad(state: GameState, ingressRPS: number) {
     
     if (current.health < 0.3 || utilization > 3) {
       current.operationalMode = 'down';
-      // O4: Direct call instead of dynamic import
-      if (previousMode !== 'down' && isCriticalNode) {
-        soundNotifications.playSystemDown();
-      }
-    } else if (current.health < 0.7 || utilization > 1.5) {
+      if (previousMode !== 'down' && isCriticalNode) soundNotifications.playSystemDown();
+    } else if (current.health < 0.8 || utilization > 1.3) {
+      // Lowered from 0.7/1.5 → player sees degraded 33% sooner
       current.operationalMode = 'degraded';
     } else {
       current.operationalMode = 'normal';
@@ -1175,12 +1175,7 @@ function checkGameOver(state: GameState, dt: number) {
     state.reputationZeroTimer = 0;
   }
 
-  if (state.uptime < 0.5 && state.uptimeStreak === 0) {
-    const critIncidents = state.activeIncidents.filter(i => i.severity === 'CRIT').length;
-    if (critIncidents >= 3) {
-      state.gameOver = true;
-      state.gameOverReason = 'Multiple critical outages - system collapse';
-    }
-  }
+  // Note: "3 CRIT = instant collapse" removed — health decay and reputation loss
+  // create natural consequences without needing an artificial instant-death trigger.
 }
 

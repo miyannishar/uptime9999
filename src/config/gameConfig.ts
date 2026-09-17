@@ -72,7 +72,7 @@ export const GAME_CONFIG = {
     autoResolveReputationReward: 0,
     // AI Incident effect caps (prevent death spiral)
     aiEffectCaps: {
-      maxHealthDecayPerSec: 0.003, // Max 0.3% health loss per second per node (even with multiple incidents)
+      maxHealthDecayPerSec: 0.004, // Max 0.4%/s — reaches degraded (0.8) in ~50s, gives time to act
       maxErrorMultiplier: 3.0, // Cap error multiplier from all incidents combined
       maxLatencyMultiplier: 2.5, // Cap latency multiplier from all incidents combined
       maxUtilizationMultiplier: 2.0, // Cap utilization multiplier from all incidents combined
@@ -247,7 +247,7 @@ export const GAME_CONFIG = {
     // How long (ms) to display the milestone banner
     milestoneDurationMs: 5000,
     // WARN escalates to CRIT after this many simulated seconds without any mitigation started
-    warnEscalateAfterSec: 150,
+    warnEscalateAfterSec: 240,
   },
 };
 

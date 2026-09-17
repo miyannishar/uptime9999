@@ -1644,3 +1644,12 @@ button:focus-visible,
 /* Arch map SVG uses inline font — set via ArchMap.tsx renderComponentSpecificMetrics */
 /* Node name text in SVG is also set inline in ArchMap.tsx — updated in Task E5 */
 
+
+/* ─── EDGE LOAD ANIMATION ─────────────────────────────────────────────────── */
+.edge-overloaded {
+  animation: edge-pulse 0.7s ease-in-out infinite alternate;
+}
+@keyframes edge-pulse {
+  from { opacity: 0.6; }
+  to   { opacity: 1.0; }
+}

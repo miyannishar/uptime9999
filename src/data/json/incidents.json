@@ -5,11 +5,23 @@
     "description": "Viral post causing +50% traffic",
     "category": "TRAFFIC",
     "severity": "WARN",
-    "targetTypes": ["CDN", "WAF", "APP"],
+    "targetTypes": [
+      "CDN",
+      "WAF",
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.5, "latencyMultiplier": 1.2 },
-    "resolutionOptions": ["scale_app_2", "scale_app_5", "enable_rate_limit_waf"],
+    "effects": {
+      "utilizationMultiplier": 1.5,
+      "latencyMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_app_5",
+      "enable_rate_limit_waf"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -18,12 +30,28 @@
     "description": "Viral event causing +200% traffic",
     "category": "TRAFFIC",
     "severity": "CRIT",
-    "targetTypes": ["CDN", "WAF", "GLB", "APP"],
-    "preconditions": { "minUtilization": 0.6 },
+    "targetTypes": [
+      "CDN",
+      "WAF",
+      "GLB",
+      "APP"
+    ],
+    "preconditions": {
+      "minUtilization": 0.6
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 3.0, "latencyMultiplier": 2.5, "errorMultiplier": 1.5 },
+    "effects": {
+      "utilizationMultiplier": 3.0,
+      "latencyMultiplier": 2.5,
+      "errorMultiplier": 1.5,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["scale_app_5", "enable_autoscaling", "enable_rate_limit_waf"],
+    "resolutionOptions": [
+      "scale_app_5",
+      "enable_autoscaling",
+      "enable_rate_limit_waf"
+    ],
     "autoResolveSeconds": 600
   },
   {
@@ -32,11 +60,23 @@
     "description": "Malicious bot swarm detected",
     "category": "TRAFFIC",
     "severity": "WARN",
-    "targetTypes": ["WAF", "APIGW"],
-    "preconditions": { "featureDisabled": "botProtection" },
+    "targetTypes": [
+      "WAF",
+      "APIGW"
+    ],
+    "preconditions": {
+      "featureDisabled": "botProtection"
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "utilizationMultiplier": 1.8, "errorMultiplier": 1.2 },
-    "resolutionOptions": ["enable_bot_protection", "enable_rate_limit_waf"],
+    "effects": {
+      "utilizationMultiplier": 1.8,
+      "errorMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "enable_bot_protection",
+      "enable_rate_limit_waf"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -45,11 +85,19 @@
     "description": "Scraper hammering API",
     "category": "TRAFFIC",
     "severity": "INFO",
-    "targetTypes": ["APIGW", "APP"],
+    "targetTypes": [
+      "APIGW",
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "utilizationMultiplier": 1.3 },
-    "resolutionOptions": ["enable_rate_limit_apigw", "enable_bot_protection"],
+    "effects": {
+      "utilizationMultiplier": 1.3
+    },
+    "resolutionOptions": [
+      "enable_rate_limit_apigw",
+      "enable_bot_protection"
+    ],
     "autoResolveSeconds": 120
   },
   {
@@ -58,12 +106,25 @@
     "description": "Application-layer DDoS attack",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["WAF", "APIGW", "APP"],
+    "targetTypes": [
+      "WAF",
+      "APIGW",
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "utilizationMultiplier": 4.0, "latencyMultiplier": 3.0, "errorMultiplier": 2.0 },
+    "effects": {
+      "utilizationMultiplier": 4.0,
+      "latencyMultiplier": 3.0,
+      "errorMultiplier": 2.0,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 90,
-    "resolutionOptions": ["enable_bot_protection", "enable_rate_limit_waf", "scale_app_5"],
+    "resolutionOptions": [
+      "enable_bot_protection",
+      "enable_rate_limit_waf",
+      "scale_app_5"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -72,11 +133,19 @@
     "description": "API keys found in public repo",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "errorMultiplier": 1.5 },
-    "resolutionOptions": ["rotate_secrets", "enable_secrets_manager"],
+    "effects": {
+      "errorMultiplier": 1.5,
+      "healthDecayPerSec": 0.008
+    },
+    "resolutionOptions": [
+      "rotate_secrets",
+      "enable_secrets_manager"
+    ],
     "autoResolveSeconds": 600
   },
   {
@@ -85,11 +154,19 @@
     "description": "Attacker probing WAF rules",
     "category": "SECURITY",
     "severity": "WARN",
-    "targetTypes": ["WAF"],
+    "targetTypes": [
+      "WAF"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.2 },
-    "resolutionOptions": ["enable_bot_protection", "security_audit"],
+    "effects": {
+      "utilizationMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "enable_bot_protection",
+      "security_audit"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -98,11 +175,21 @@
     "description": "Malicious SQL in requests",
     "category": "SECURITY",
     "severity": "WARN",
-    "targetTypes": ["APIGW", "APP"],
+    "targetTypes": [
+      "APIGW",
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.1 },
-    "resolutionOptions": ["enable_rate_limit_apigw", "patch_dependency", "security_audit"],
+    "effects": {
+      "errorMultiplier": 1.1,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "enable_rate_limit_apigw",
+      "patch_dependency",
+      "security_audit"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -111,11 +198,20 @@
     "description": "Critical CVE published",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
-    "preconditions": { "minTechDebt": 30 },
+    "targetTypes": [
+      "APP"
+    ],
+    "preconditions": {
+      "minTechDebt": 30
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "healthDecayPerSec": 0.01 },
-    "resolutionOptions": ["patch_dependency", "security_audit"],
+    "effects": {
+      "healthDecayPerSec": 0.01
+    },
+    "resolutionOptions": [
+      "patch_dependency",
+      "security_audit"
+    ],
     "autoResolveSeconds": 480
   },
   {
@@ -124,14 +220,24 @@
     "description": "Recent deploy introduced bugs",
     "category": "DEPLOY",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.04,
-    "effects": { "errorMultiplier": 3.0, "latencyMultiplier": 1.5 },
+    "effects": {
+      "errorMultiplier": 3.0,
+      "latencyMultiplier": 1.5,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 180,
     "escalatesTo": "complete_outage",
     "escalationTimeSeconds": 120,
-    "resolutionOptions": ["rollback_deploy", "emergency_restart", "scale_app_5"]
+    "resolutionOptions": [
+      "rollback_deploy",
+      "emergency_restart",
+      "scale_app_5"
+    ]
   },
   {
     "id": "config_drift",
@@ -139,11 +245,23 @@
     "description": "Config out of sync across instances",
     "category": "DEPLOY",
     "severity": "WARN",
-    "targetTypes": ["APP", "WORKERS"],
-    "preconditions": { "minTechDebt": 40 },
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minTechDebt": 40
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.4, "latencyMultiplier": 1.2 },
-    "resolutionOptions": ["rollback_deploy", "scale_app_1"],
+    "effects": {
+      "errorMultiplier": 1.4,
+      "latencyMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "rollback_deploy",
+      "scale_app_1"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -152,11 +270,19 @@
     "description": "Rate limit too aggressive",
     "category": "DEPLOY",
     "severity": "WARN",
-    "targetTypes": ["WAF", "APIGW"],
+    "targetTypes": [
+      "WAF",
+      "APIGW"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.3 },
-    "resolutionOptions": ["enable_rate_limit_apigw"],
+    "effects": {
+      "errorMultiplier": 1.3,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "enable_rate_limit_apigw"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -165,11 +291,18 @@
     "description": "Canary showing high errors",
     "category": "DEPLOY",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 1.5 },
-    "resolutionOptions": ["rollback_deploy"],
+    "effects": {
+      "errorMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 120
   },
   {
@@ -178,25 +311,43 @@
     "description": "DNS record pointing to wrong endpoint",
     "category": "DNS",
     "severity": "CRIT",
-    "targetTypes": ["DNS"],
+    "targetTypes": [
+      "DNS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "errorMultiplier": 5.0, "healthDecayPerSec": 0.05 },
+    "effects": {
+      "errorMultiplier": 5.0,
+      "healthDecayPerSec": 0.05
+    },
     "timeToOutageSeconds": 60,
-    "resolutionOptions": ["emergency_restart", "security_audit"],
+    "resolutionOptions": [
+      "emergency_restart",
+      "security_audit"
+    ],
     "autoResolveSeconds": 240
   },
   {
     "id": "tls_cert_expiring",
     "name": "TLS Cert Expiring Soon",
-    "description": "Certificate expires in 7 days — browsers will show warnings",
+    "description": "Certificate expires in 7 days \u2014 browsers will show warnings",
     "category": "DNS",
     "severity": "WARN",
-    "targetTypes": ["CDN", "GLB"],
+    "targetTypes": [
+      "CDN",
+      "GLB"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.005,
-    "effects": { "latencyMultiplier": 1.1, "errorMultiplier": 1.05 },
-    "resolutionOptions": ["renew_tls_cert", "security_audit"],
+    "effects": {
+      "latencyMultiplier": 1.1,
+      "errorMultiplier": 1.05,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "renew_tls_cert",
+      "security_audit"
+    ],
     "autoResolveSeconds": 600
   },
   {
@@ -205,12 +356,21 @@
     "description": "Certificate expired, causing outage",
     "category": "DNS",
     "severity": "CRIT",
-    "targetTypes": ["CDN", "GLB"],
+    "targetTypes": [
+      "CDN",
+      "GLB"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.002,
-    "effects": { "errorMultiplier": 10.0, "healthDecayPerSec": 0.05 },
+    "effects": {
+      "errorMultiplier": 10.0,
+      "healthDecayPerSec": 0.05
+    },
     "timeToOutageSeconds": 30,
-    "resolutionOptions": ["renew_tls_cert", "security_audit"]
+    "resolutionOptions": [
+      "renew_tls_cert",
+      "security_audit"
+    ]
   },
   {
     "id": "dns_propagation_delay",
@@ -218,11 +378,17 @@
     "description": "DNS changes taking long to propagate",
     "category": "DNS",
     "severity": "INFO",
-    "targetTypes": ["DNS"],
+    "targetTypes": [
+      "DNS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 1.5 },
-    "resolutionOptions": ["rollback_deploy"],
+    "effects": {
+      "latencyMultiplier": 1.5
+    },
+    "resolutionOptions": [
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -231,13 +397,25 @@
     "description": "App instances leaking memory",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP", "WORKERS"],
-    "preconditions": { "minTechDebt": 20 },
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minTechDebt": 20
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "utilizationMultiplier": 1.5, "latencyMultiplier": 1.8, "healthDecayPerSec": 0.005 },
+    "effects": {
+      "utilizationMultiplier": 1.5,
+      "latencyMultiplier": 1.8,
+      "healthDecayPerSec": 0.005
+    },
     "escalatesTo": "oom_crash",
     "escalationTimeSeconds": 300,
-    "resolutionOptions": ["scale_app_2", "rollback_deploy"],
+    "resolutionOptions": [
+      "scale_app_2",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 600
   },
   {
@@ -246,11 +424,24 @@
     "description": "High CPU causing degradation",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP", "WORKERS"],
-    "preconditions": { "minUtilization": 0.7 },
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minUtilization": 0.7
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "latencyMultiplier": 2.0, "errorMultiplier": 1.3 },
-    "resolutionOptions": ["scale_app_2", "scale_app_5", "enable_autoscaling"],
+    "effects": {
+      "latencyMultiplier": 2.0,
+      "errorMultiplier": 1.3,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_app_5",
+      "enable_autoscaling"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -259,12 +450,23 @@
     "description": "Instance disk at 100%",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP", "WORKERS", "DB_PRIMARY"],
-    "preconditions": { "minTechDebt": 30 },
+    "targetTypes": [
+      "APP",
+      "WORKERS",
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minTechDebt": 30
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 5.0, "healthDecayPerSec": 0.02 },
+    "effects": {
+      "errorMultiplier": 5.0,
+      "healthDecayPerSec": 0.02
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["scale_app_1"],
+    "resolutionOptions": [
+      "scale_app_1"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -273,11 +475,20 @@
     "description": "Instance rebooted unexpectedly",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP", "WORKERS"],
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.3, "errorMultiplier": 1.2 },
-    "resolutionOptions": ["scale_app_1"],
+    "effects": {
+      "utilizationMultiplier": 1.3,
+      "errorMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_1"
+    ],
     "autoResolveSeconds": 120
   },
   {
@@ -286,12 +497,22 @@
     "description": "Instance OOMKilled",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP", "WORKERS"],
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 2.0, "errorMultiplier": 2.5, "healthDecayPerSec": 0.01 },
+    "effects": {
+      "utilizationMultiplier": 2.0,
+      "errorMultiplier": 2.5,
+      "healthDecayPerSec": 0.01
+    },
     "timeToOutageSeconds": 90,
-    "resolutionOptions": ["scale_app_2", "scale_app_vertical"],
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_app_vertical"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -300,11 +521,23 @@
     "description": "Network bandwidth maxed out",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["RLB", "APP"],
-    "preconditions": { "minUtilization": 0.8 },
+    "targetTypes": [
+      "RLB",
+      "APP"
+    ],
+    "preconditions": {
+      "minUtilization": 0.8
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 2.5, "errorMultiplier": 1.4 },
-    "resolutionOptions": ["scale_app_2", "scale_rlb"],
+    "effects": {
+      "latencyMultiplier": 2.5,
+      "errorMultiplier": 1.4,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_rlb"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -313,12 +546,24 @@
     "description": "Max connections reached",
     "category": "DATABASE",
     "severity": "CRIT",
-    "targetTypes": ["DB_PRIMARY"],
-    "preconditions": { "minUtilization": 0.7, "featureDisabled": "connectionPool" },
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minUtilization": 0.7,
+      "featureDisabled": "connectionPool"
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 3.0, "latencyMultiplier": 2.0 },
+    "effects": {
+      "errorMultiplier": 3.0,
+      "latencyMultiplier": 2.0,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 150,
-    "resolutionOptions": ["increase_db_connections", "add_connection_pooler"],
+    "resolutionOptions": [
+      "increase_db_connections",
+      "add_connection_pooler"
+    ],
     "autoResolveSeconds": 480
   },
   {
@@ -327,11 +572,23 @@
     "description": "Inefficient queries slowing DB",
     "category": "DATABASE",
     "severity": "WARN",
-    "targetTypes": ["DB_PRIMARY"],
-    "preconditions": { "minTechDebt": 25 },
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minTechDebt": 25
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "latencyMultiplier": 2.5, "utilizationMultiplier": 1.4 },
-    "resolutionOptions": ["optimize_queries", "add_connection_pooler", "upgrade_db_replica"],
+    "effects": {
+      "latencyMultiplier": 2.5,
+      "utilizationMultiplier": 1.4,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "optimize_queries",
+      "add_connection_pooler",
+      "upgrade_db_replica"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -340,11 +597,22 @@
     "description": "Read replica falling behind",
     "category": "DATABASE",
     "severity": "WARN",
-    "targetTypes": ["DB_REPLICA"],
-    "preconditions": { "minUtilization": 0.6 },
+    "targetTypes": [
+      "DB_REPLICA"
+    ],
+    "preconditions": {
+      "minUtilization": 0.6
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.3, "latencyMultiplier": 1.4 },
-    "resolutionOptions": ["upgrade_db_replica", "optimize_queries"],
+    "effects": {
+      "errorMultiplier": 1.3,
+      "latencyMultiplier": 1.4,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "upgrade_db_replica",
+      "optimize_queries"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -353,11 +621,20 @@
     "description": "Transactions deadlocking",
     "category": "DATABASE",
     "severity": "WARN",
-    "targetTypes": ["DB_PRIMARY"],
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.5, "latencyMultiplier": 1.6 },
-    "resolutionOptions": ["optimize_queries", "add_connection_pooler"],
+    "effects": {
+      "errorMultiplier": 1.5,
+      "latencyMultiplier": 1.6,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "optimize_queries",
+      "add_connection_pooler"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -366,25 +643,39 @@
     "description": "DB storage at capacity",
     "category": "DATABASE",
     "severity": "CRIT",
-    "targetTypes": ["DB_PRIMARY"],
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 10.0, "healthDecayPerSec": 0.03 },
+    "effects": {
+      "errorMultiplier": 10.0,
+      "healthDecayPerSec": 0.03
+    },
     "timeToOutageSeconds": 60,
-    "resolutionOptions": ["scale_db_vertical"],
+    "resolutionOptions": [
+      "scale_db_vertical"
+    ],
     "autoResolveSeconds": 360
   },
   {
     "id": "db_backup_failure",
     "name": "DB Backup Failed",
-    "description": "Automated backup failed — data loss risk accumulating",
+    "description": "Automated backup failed \u2014 data loss risk accumulating",
     "category": "DATABASE",
     "severity": "INFO",
-    "targetTypes": ["DB_PRIMARY"],
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 1.05 },
-    "resolutionOptions": ["optimize_queries", "security_audit"],
+    "effects": {
+      "errorMultiplier": 1.05
+    },
+    "resolutionOptions": [
+      "optimize_queries",
+      "security_audit"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -393,11 +684,23 @@
     "description": "Messages piling up in queue",
     "category": "QUEUE",
     "severity": "WARN",
-    "targetTypes": ["QUEUE"],
-    "preconditions": { "minUtilization": 0.6 },
+    "targetTypes": [
+      "QUEUE"
+    ],
+    "preconditions": {
+      "minUtilization": 0.6
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "utilizationMultiplier": 1.6, "latencyMultiplier": 1.5 },
-    "resolutionOptions": ["add_workers_2", "add_workers_5", "increase_queue_throughput"],
+    "effects": {
+      "utilizationMultiplier": 1.6,
+      "latencyMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "add_workers_2",
+      "add_workers_5",
+      "increase_queue_throughput"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -406,11 +709,21 @@
     "description": "Bad message causing retry loop",
     "category": "QUEUE",
     "severity": "CRIT",
-    "targetTypes": ["QUEUE", "WORKERS"],
+    "targetTypes": [
+      "QUEUE",
+      "WORKERS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.04,
-    "effects": { "utilizationMultiplier": 3.0, "errorMultiplier": 2.0 },
-    "resolutionOptions": ["pause_workers", "rollback_deploy"],
+    "effects": {
+      "utilizationMultiplier": 3.0,
+      "errorMultiplier": 2.0,
+      "healthDecayPerSec": 0.008
+    },
+    "resolutionOptions": [
+      "pause_workers",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -419,12 +732,22 @@
     "description": "Workers crashing repeatedly",
     "category": "QUEUE",
     "severity": "CRIT",
-    "targetTypes": ["WORKERS"],
-    "preconditions": { "minTechDebt": 30 },
+    "targetTypes": [
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minTechDebt": 30
+    },
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 4.0, "healthDecayPerSec": 0.02 },
+    "effects": {
+      "errorMultiplier": 4.0,
+      "healthDecayPerSec": 0.02
+    },
     "timeToOutageSeconds": 180,
-    "resolutionOptions": ["rollback_deploy", "pause_workers"],
+    "resolutionOptions": [
+      "rollback_deploy",
+      "pause_workers"
+    ],
     "autoResolveSeconds": 360
   },
   {
@@ -433,11 +756,19 @@
     "description": "DLQ at capacity",
     "category": "QUEUE",
     "severity": "WARN",
-    "targetTypes": ["QUEUE"],
+    "targetTypes": [
+      "QUEUE"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.3 },
-    "resolutionOptions": ["increase_queue_throughput", "pause_workers"],
+    "effects": {
+      "errorMultiplier": 1.3,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "increase_queue_throughput",
+      "pause_workers"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -446,11 +777,22 @@
     "description": "External dependency unavailable",
     "category": "EXTERNAL",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 2.0, "latencyMultiplier": 1.5 },
-    "resolutionOptions": ["enable_circuit_breaker", "enable_retries", "rollback_deploy", "scale_app_2"],
+    "effects": {
+      "errorMultiplier": 2.0,
+      "latencyMultiplier": 1.5,
+      "healthDecayPerSec": 0.008
+    },
+    "resolutionOptions": [
+      "enable_circuit_breaker",
+      "enable_retries",
+      "rollback_deploy",
+      "scale_app_2"
+    ],
     "autoResolveSeconds": 600
   },
   {
@@ -459,11 +801,21 @@
     "description": "External API responding slowly",
     "category": "EXTERNAL",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "latencyMultiplier": 2.0 },
-    "resolutionOptions": ["enable_circuit_breaker", "enable_retries", "scale_app_1", "scale_cache"],
+    "effects": {
+      "latencyMultiplier": 2.0,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "enable_circuit_breaker",
+      "enable_retries",
+      "scale_app_1",
+      "scale_cache"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -472,11 +824,23 @@
     "description": "Cloud provider degraded performance",
     "category": "EXTERNAL",
     "severity": "WARN",
-    "targetTypes": ["APP", "DB_PRIMARY", "CACHE"],
+    "targetTypes": [
+      "APP",
+      "DB_PRIMARY",
+      "CACHE"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.04,
-    "effects": { "latencyMultiplier": 1.8, "errorMultiplier": 1.2 },
-    "resolutionOptions": ["add_region_eu", "scale_app_2", "enable_circuit_breaker"],
+    "effects": {
+      "latencyMultiplier": 1.8,
+      "errorMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "add_region_eu",
+      "scale_app_2",
+      "enable_circuit_breaker"
+    ],
     "autoResolveSeconds": 900
   },
   {
@@ -485,12 +849,24 @@
     "description": "Entire cloud region down",
     "category": "EXTERNAL",
     "severity": "CRIT",
-    "targetTypes": ["GLB", "RLB", "APP", "DB_PRIMARY"],
+    "targetTypes": [
+      "GLB",
+      "RLB",
+      "APP",
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.005,
-    "effects": { "errorMultiplier": 10.0, "healthDecayPerSec": 0.1 },
+    "effects": {
+      "errorMultiplier": 10.0,
+      "healthDecayPerSec": 0.1
+    },
     "timeToOutageSeconds": 30,
-    "resolutionOptions": ["add_region_eu", "failover_to_replica", "rollback_deploy"],
+    "resolutionOptions": [
+      "add_region_eu",
+      "failover_to_replica",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -499,50 +875,82 @@
     "description": "CDN having issues",
     "category": "EXTERNAL",
     "severity": "WARN",
-    "targetTypes": ["CDN"],
+    "targetTypes": [
+      "CDN"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 1.5, "errorMultiplier": 1.2 },
-    "resolutionOptions": ["purge_cdn_cache", "increase_cdn_ttl", "scale_down_cdn"],
+    "effects": {
+      "latencyMultiplier": 1.5,
+      "errorMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "purge_cdn_cache",
+      "increase_cdn_ttl",
+      "scale_down_cdn"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "log_pipeline_down",
     "name": "Log Pipeline Down",
-    "description": "Logs not being collected — debugging will take longer",
+    "description": "Logs not being collected \u2014 debugging will take longer",
     "category": "OBSERVABILITY",
     "severity": "WARN",
-    "targetTypes": ["OBSERVABILITY"],
+    "targetTypes": [
+      "OBSERVABILITY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.04,
-    "effects": { "latencyMultiplier": 1.2 },
-    "resolutionOptions": ["upgrade_observability_metrics", "add_log_aggregation"],
+    "effects": {
+      "latencyMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "upgrade_observability_metrics",
+      "add_log_aggregation"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "alert_fatigue_spike",
     "name": "Alert Fatigue Spike",
-    "description": "Too many alerts — real issues getting missed",
+    "description": "Too many alerts \u2014 real issues getting missed",
     "category": "OBSERVABILITY",
     "severity": "INFO",
-    "targetTypes": ["OBSERVABILITY"],
+    "targetTypes": [
+      "OBSERVABILITY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.1 },
-    "resolutionOptions": ["hire_sre", "add_alert_rules"],
+    "effects": {
+      "errorMultiplier": 1.1
+    },
+    "resolutionOptions": [
+      "hire_sre",
+      "add_alert_rules"
+    ],
     "autoResolveSeconds": 600
   },
   {
     "id": "metrics_lag",
     "name": "Metrics Reporting Lag",
-    "description": "Metrics delayed — operating blind, slower incident response",
+    "description": "Metrics delayed \u2014 operating blind, slower incident response",
     "category": "OBSERVABILITY",
     "severity": "WARN",
-    "targetTypes": ["OBSERVABILITY"],
+    "targetTypes": [
+      "OBSERVABILITY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "healthDecayPerSec": 0.001 },
-    "resolutionOptions": ["upgrade_observability_traces", "add_distributed_tracing"],
+    "effects": {
+      "healthDecayPerSec": 0.001
+    },
+    "resolutionOptions": [
+      "upgrade_observability_traces",
+      "add_distributed_tracing"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -551,11 +959,20 @@
     "description": "Mass cache invalidations",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["CACHE"],
+    "targetTypes": [
+      "CACHE"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 2.0, "latencyMultiplier": 1.5 },
-    "resolutionOptions": ["scale_cache", "flush_cache"],
+    "effects": {
+      "utilizationMultiplier": 2.0,
+      "latencyMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_cache",
+      "flush_cache"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -564,11 +981,20 @@
     "description": "Redis connection issues",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["CACHE"],
+    "targetTypes": [
+      "CACHE"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.03,
-    "effects": { "errorMultiplier": 2.0, "latencyMultiplier": 1.8 },
-    "resolutionOptions": ["scale_cache", "flush_cache"],
+    "effects": {
+      "errorMultiplier": 2.0,
+      "latencyMultiplier": 1.8,
+      "healthDecayPerSec": 0.008
+    },
+    "resolutionOptions": [
+      "scale_cache",
+      "flush_cache"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -577,12 +1003,24 @@
     "description": "Cascading retries amplifying load",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
-    "preconditions": { "featureDisabled": "circuitBreaker" },
+    "targetTypes": [
+      "APP"
+    ],
+    "preconditions": {
+      "featureDisabled": "circuitBreaker"
+    },
     "baseRatePerMinute": 0.04,
-    "effects": { "utilizationMultiplier": 5.0, "latencyMultiplier": 3.0, "errorMultiplier": 2.0 },
+    "effects": {
+      "utilizationMultiplier": 5.0,
+      "latencyMultiplier": 3.0,
+      "errorMultiplier": 2.0,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["enable_circuit_breaker", "scale_app_5"],
+    "resolutionOptions": [
+      "enable_circuit_breaker",
+      "scale_app_5"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -591,10 +1029,15 @@
     "description": "Total system failure - try emergency recovery actions",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "errorMultiplier": 100.0, "healthDecayPerSec": 0.1 },
+    "effects": {
+      "errorMultiplier": 100.0,
+      "healthDecayPerSec": 0.1
+    },
     "timeToOutageSeconds": 0,
     "resolutionOptions": [
       "emergency_restart",
@@ -609,30 +1052,58 @@
   },
   {
     "id": "cascading_cache_db",
-    "name": "Cache Failure → DB Overload",
+    "name": "Cache Failure \u2192 DB Overload",
     "description": "Cache miss storm flooding database with reads",
     "category": "DATABASE",
     "severity": "CRIT",
-    "targetTypes": ["CACHE", "DB_PRIMARY"],
-    "preconditions": { "minUtilization": 0.5 },
+    "targetTypes": [
+      "CACHE",
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minUtilization": 0.5
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 3.0, "latencyMultiplier": 2.5, "errorMultiplier": 2.0 },
+    "effects": {
+      "utilizationMultiplier": 3.0,
+      "latencyMultiplier": 2.5,
+      "errorMultiplier": 2.0,
+      "healthDecayPerSec": 0.008
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["scale_cache", "flush_cache", "add_connection_pooler", "scale_app_5"],
+    "resolutionOptions": [
+      "scale_cache",
+      "flush_cache",
+      "add_connection_pooler",
+      "scale_app_5"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "cascading_db_app",
-    "name": "DB Timeout → App Thread Exhaustion",
+    "name": "DB Timeout \u2192 App Thread Exhaustion",
     "description": "Database timeouts causing app threads to pile up",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP", "DB_PRIMARY"],
-    "preconditions": { "minUtilization": 0.6 },
+    "targetTypes": [
+      "APP",
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minUtilization": 0.6
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 2.5, "errorMultiplier": 3.0, "healthDecayPerSec": 0.002 },
+    "effects": {
+      "utilizationMultiplier": 2.5,
+      "errorMultiplier": 3.0,
+      "healthDecayPerSec": 0.002
+    },
     "timeToOutageSeconds": 150,
-    "resolutionOptions": ["enable_circuit_breaker", "increase_db_connections", "scale_app_5"],
+    "resolutionOptions": [
+      "enable_circuit_breaker",
+      "increase_db_connections",
+      "scale_app_5"
+    ],
     "autoResolveSeconds": 360
   },
   {
@@ -641,25 +1112,46 @@
     "description": "Kubernetes evicting pods due to node resource pressure",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP", "WORKERS"],
-    "preconditions": { "minUtilization": 0.8 },
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minUtilization": 0.8
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.6, "errorMultiplier": 1.4 },
-    "resolutionOptions": ["scale_app_2", "scale_app_5", "enable_autoscaling"],
+    "effects": {
+      "utilizationMultiplier": 1.6,
+      "errorMultiplier": 1.4,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_app_5",
+      "enable_autoscaling"
+    ],
     "autoResolveSeconds": 180
   },
   {
     "id": "container_image_pull_fail",
     "name": "Container Image Pull Failure",
-    "description": "Container registry unreachable — cannot scale or restart pods",
+    "description": "Container registry unreachable \u2014 cannot scale or restart pods",
     "category": "EXTERNAL",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "errorMultiplier": 2.0, "healthDecayPerSec": 0.002 },
+    "effects": {
+      "errorMultiplier": 2.0,
+      "healthDecayPerSec": 0.002
+    },
     "timeToOutageSeconds": 180,
-    "resolutionOptions": ["emergency_restart", "rollback_deploy"],
+    "resolutionOptions": [
+      "emergency_restart",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -668,12 +1160,25 @@
     "description": "No more VM capacity to schedule new pods",
     "category": "COMPUTE",
     "severity": "CRIT",
-    "targetTypes": ["APP", "WORKERS"],
-    "preconditions": { "minUtilization": 0.9 },
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
+    "preconditions": {
+      "minUtilization": 0.9
+    },
     "baseRatePerMinute": 0.01,
-    "effects": { "utilizationMultiplier": 2.0, "errorMultiplier": 2.5, "healthDecayPerSec": 0.003 },
+    "effects": {
+      "utilizationMultiplier": 2.0,
+      "errorMultiplier": 2.5,
+      "healthDecayPerSec": 0.003
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["scale_app_vertical", "enable_autoscaling", "scale_app_5"],
+    "resolutionOptions": [
+      "scale_app_vertical",
+      "enable_autoscaling",
+      "scale_app_5"
+    ],
     "autoResolveSeconds": 360
   },
   {
@@ -682,11 +1187,21 @@
     "description": "Pods restarting repeatedly due to slow health check responses",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.4, "errorMultiplier": 1.3, "latencyMultiplier": 1.5 },
-    "resolutionOptions": ["scale_app_2", "rollback_deploy"],
+    "effects": {
+      "utilizationMultiplier": 1.4,
+      "errorMultiplier": 1.3,
+      "latencyMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -695,11 +1210,19 @@
     "description": "Sidecar proxies adding 50ms latency per hop",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 1.8 },
-    "resolutionOptions": ["scale_app_2", "add_distributed_tracing"],
+    "effects": {
+      "latencyMultiplier": 1.8,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "add_distributed_tracing"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -708,67 +1231,113 @@
     "description": "Inter-service TLS handshakes failing after cert rotation",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "errorMultiplier": 3.0, "healthDecayPerSec": 0.002 },
+    "effects": {
+      "errorMultiplier": 3.0,
+      "healthDecayPerSec": 0.002
+    },
     "timeToOutageSeconds": 120,
-    "resolutionOptions": ["renew_tls_cert", "rollback_deploy", "emergency_restart"],
+    "resolutionOptions": [
+      "renew_tls_cert",
+      "rollback_deploy",
+      "emergency_restart"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "dns_cache_poisoning",
     "name": "DNS Cache Poisoning Attempt",
-    "description": "Spoofed DNS responses detected — traffic being misdirected",
+    "description": "Spoofed DNS responses detected \u2014 traffic being misdirected",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["DNS"],
+    "targetTypes": [
+      "DNS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.005,
-    "effects": { "errorMultiplier": 4.0, "healthDecayPerSec": 0.003 },
+    "effects": {
+      "errorMultiplier": 4.0,
+      "healthDecayPerSec": 0.003
+    },
     "timeToOutageSeconds": 90,
-    "resolutionOptions": ["security_audit", "enable_bot_protection", "emergency_restart"],
+    "resolutionOptions": [
+      "security_audit",
+      "enable_bot_protection",
+      "emergency_restart"
+    ],
     "autoResolveSeconds": 240
   },
   {
     "id": "data_corruption",
     "name": "Data Corruption Detected",
-    "description": "Checksum mismatch — corrupted rows found in primary DB",
+    "description": "Checksum mismatch \u2014 corrupted rows found in primary DB",
     "category": "DATABASE",
     "severity": "CRIT",
-    "targetTypes": ["DB_PRIMARY"],
-    "preconditions": { "minTechDebt": 30 },
+    "targetTypes": [
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minTechDebt": 30
+    },
     "baseRatePerMinute": 0.005,
-    "effects": { "errorMultiplier": 3.0, "healthDecayPerSec": 0.003 },
+    "effects": {
+      "errorMultiplier": 3.0,
+      "healthDecayPerSec": 0.003
+    },
     "timeToOutageSeconds": 180,
-    "resolutionOptions": ["failover_to_replica", "restart_database", "security_audit"],
+    "resolutionOptions": [
+      "failover_to_replica",
+      "restart_database",
+      "security_audit"
+    ],
     "autoResolveSeconds": 480
   },
   {
     "id": "replication_split_brain",
     "name": "Replication Split-Brain",
-    "description": "Both DB nodes think they are primary — write conflicts",
+    "description": "Both DB nodes think they are primary \u2014 write conflicts",
     "category": "DATABASE",
     "severity": "CRIT",
-    "targetTypes": ["DB_PRIMARY", "DB_REPLICA"],
+    "targetTypes": [
+      "DB_PRIMARY",
+      "DB_REPLICA"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.005,
-    "effects": { "errorMultiplier": 5.0, "healthDecayPerSec": 0.003 },
+    "effects": {
+      "errorMultiplier": 5.0,
+      "healthDecayPerSec": 0.003
+    },
     "timeToOutageSeconds": 90,
-    "resolutionOptions": ["restart_database", "failover_to_replica"],
+    "resolutionOptions": [
+      "restart_database",
+      "failover_to_replica"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "storage_quota_exceeded",
     "name": "Object Storage Quota Hit",
-    "description": "Storage writes failing silently — uploads broken",
+    "description": "Storage writes failing silently \u2014 uploads broken",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "errorMultiplier": 1.5 },
-    "resolutionOptions": ["scale_app_1", "optimize_queries"],
+    "effects": {
+      "errorMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_1",
+      "optimize_queries"
+    ],
     "autoResolveSeconds": 300
   },
   {
@@ -777,37 +1346,63 @@
     "description": "Must process user data deletion within 72 hours",
     "category": "COMPUTE",
     "severity": "INFO",
-    "targetTypes": ["APP", "DB_PRIMARY"],
+    "targetTypes": [
+      "APP",
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.2 },
-    "resolutionOptions": ["optimize_queries", "add_workers_2"],
+    "effects": {
+      "utilizationMultiplier": 1.2
+    },
+    "resolutionOptions": [
+      "optimize_queries",
+      "add_workers_2"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "pci_audit_triggered",
     "name": "PCI Compliance Audit",
-    "description": "Automated compliance scanner running — consuming resources",
+    "description": "Automated compliance scanner running \u2014 consuming resources",
     "category": "SECURITY",
     "severity": "WARN",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "utilizationMultiplier": 1.3, "latencyMultiplier": 1.2 },
-    "resolutionOptions": ["security_audit", "scale_app_2"],
+    "effects": {
+      "utilizationMultiplier": 1.3,
+      "latencyMultiplier": 1.2,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "security_audit",
+      "scale_app_2"
+    ],
     "autoResolveSeconds": 300
   },
   {
     "id": "data_breach_report",
     "name": "Data Breach Notification",
-    "description": "Potential data breach detected — reputation at risk",
+    "description": "Potential data breach detected \u2014 reputation at risk",
     "category": "SECURITY",
     "severity": "CRIT",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.005,
-    "effects": { "errorMultiplier": 1.5, "healthDecayPerSec": 0.002 },
-    "resolutionOptions": ["rotate_secrets", "security_audit", "enable_secrets_manager"],
+    "effects": {
+      "errorMultiplier": 1.5,
+      "healthDecayPerSec": 0.002
+    },
+    "resolutionOptions": [
+      "rotate_secrets",
+      "security_audit",
+      "enable_secrets_manager"
+    ],
     "autoResolveSeconds": 480
   },
   {
@@ -816,11 +1411,23 @@
     "description": "Garbage collection freezing application threads",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["APP"],
-    "preconditions": { "minUtilization": 0.7 },
+    "targetTypes": [
+      "APP"
+    ],
+    "preconditions": {
+      "minUtilization": 0.7
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 2.0, "utilizationMultiplier": 1.5 },
-    "resolutionOptions": ["scale_app_2", "scale_app_vertical", "rollback_deploy"],
+    "effects": {
+      "latencyMultiplier": 2.0,
+      "utilizationMultiplier": 1.5,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "scale_app_vertical",
+      "rollback_deploy"
+    ],
     "autoResolveSeconds": 180
   },
   {
@@ -829,13 +1436,26 @@
     "description": "DB connections opened but never returned to pool",
     "category": "DATABASE",
     "severity": "WARN",
-    "targetTypes": ["APP", "DB_PRIMARY"],
-    "preconditions": { "minTechDebt": 20 },
+    "targetTypes": [
+      "APP",
+      "DB_PRIMARY"
+    ],
+    "preconditions": {
+      "minTechDebt": 20
+    },
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.6, "latencyMultiplier": 1.4, "healthDecayPerSec": 0.001 },
+    "effects": {
+      "utilizationMultiplier": 1.6,
+      "latencyMultiplier": 1.4,
+      "healthDecayPerSec": 0.001
+    },
     "escalatesTo": "db_connection_exhaustion",
     "escalationTimeSeconds": 240,
-    "resolutionOptions": ["add_connection_pooler", "rollback_deploy", "emergency_restart"],
+    "resolutionOptions": [
+      "add_connection_pooler",
+      "rollback_deploy",
+      "emergency_restart"
+    ],
     "autoResolveSeconds": 360
   },
   {
@@ -844,11 +1464,22 @@
     "description": "Single cache key receiving disproportionate traffic",
     "category": "COMPUTE",
     "severity": "WARN",
-    "targetTypes": ["CACHE", "DB_PRIMARY"],
+    "targetTypes": [
+      "CACHE",
+      "DB_PRIMARY"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "latencyMultiplier": 1.6, "utilizationMultiplier": 1.8 },
-    "resolutionOptions": ["scale_cache", "flush_cache", "optimize_queries"],
+    "effects": {
+      "latencyMultiplier": 1.6,
+      "utilizationMultiplier": 1.8,
+      "healthDecayPerSec": 0.003
+    },
+    "resolutionOptions": [
+      "scale_cache",
+      "flush_cache",
+      "optimize_queries"
+    ],
     "autoResolveSeconds": 240
   },
   {
@@ -857,24 +1488,40 @@
     "description": "Random instance killed for resilience testing",
     "category": "COMPUTE",
     "severity": "INFO",
-    "targetTypes": ["APP", "WORKERS"],
+    "targetTypes": [
+      "APP",
+      "WORKERS"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.02,
-    "effects": { "utilizationMultiplier": 1.2, "errorMultiplier": 1.1 },
-    "resolutionOptions": ["scale_app_1", "add_workers_2"],
+    "effects": {
+      "utilizationMultiplier": 1.2,
+      "errorMultiplier": 1.1
+    },
+    "resolutionOptions": [
+      "scale_app_1",
+      "add_workers_2"
+    ],
     "autoResolveSeconds": 120
   },
   {
     "id": "gameday_drill",
     "name": "GameDay Drill",
-    "description": "Simulated outage drill — handle it well for reputation bonus",
+    "description": "Simulated outage drill \u2014 handle it well for reputation bonus",
     "category": "COMPUTE",
     "severity": "INFO",
-    "targetTypes": ["APP"],
+    "targetTypes": [
+      "APP"
+    ],
     "preconditions": {},
     "baseRatePerMinute": 0.01,
-    "effects": { "utilizationMultiplier": 1.3 },
-    "resolutionOptions": ["scale_app_2", "enable_autoscaling"],
+    "effects": {
+      "utilizationMultiplier": 1.3
+    },
+    "resolutionOptions": [
+      "scale_app_2",
+      "enable_autoscaling"
+    ],
     "autoResolveSeconds": 180
   }
 ]
