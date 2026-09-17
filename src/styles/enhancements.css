@@ -859,3 +859,57 @@
   from { transform: rotate(-20deg) scale(0.5); }
   to   { transform: rotate(0deg) scale(1); }
 }
+
+/* ─── STAKEHOLDER MESSAGES IN INCIDENT FEED ───────────────────────────────── */
+.stakeholder-message-item {
+  border-left: 3px solid #3b82f6 !important;
+  background: #0a1025 !important;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.stakeholder-message-item:hover { background: #0d1535 !important; }
+.stakeholder-message-item.expanded { background: #0d1535 !important; }
+
+.stakeholder-icon { font-size: 1.1rem; margin-right: 4px; }
+.stakeholder-char { font-weight: 600; color: #60a5fa; font-size: 0.8rem; flex: 1; }
+
+.expires-badge {
+  font-size: 0.7rem; color: #888; font-family: monospace;
+  padding: 1px 4px; border-radius: 3px; background: #1a1a2e;
+}
+.expires-badge.urgent { color: #ef4444; animation: pulse-text 0.8s infinite; }
+@keyframes pulse-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.stakeholder-preview {
+  color: #9ca3af !important;
+  font-size: 0.78rem !important;
+  line-height: 1.4 !important;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.stakeholder-responses {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1e3a5f;
+}
+.stakeholder-response-btn {
+  background: #0f2044;
+  border: 1px solid #1e40af;
+  border-radius: 6px;
+  color: #93c5fd;
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.stakeholder-response-btn:hover {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #bfdbfe;
+}

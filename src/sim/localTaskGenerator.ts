@@ -106,8 +106,13 @@ function buildMonitorTask(def: IncidentDefinition): TaskData {
   return { type: 'monitor', data: t };
 }
 
+const INCIDENT_SPECIFIC = rawTemplates.incidentSpecific as Record<string, TaskData> | undefined;
+
 /** Generates a task without any API call. Always succeeds. */
 export function generateLocalTask(def: IncidentDefinition, action: ActionDefinition): TaskData {
+  // Incident-specific override: gives a highly relevant task for known incident types
+  if (INCIDENT_SPECIFIC?.[def.id]) return INCIDENT_SPECIFIC[def.id];
+
   const type = pickTaskType(def, action);
   switch (type) {
     case 'terminal':       return buildTerminalTask(def, action);

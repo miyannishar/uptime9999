@@ -21,7 +21,6 @@ import { GAME_CONFIG } from './config/gameConfig';
 
 // Enhancement feature imports
 import StatusPage from './ui/StatusPage';
-import StakeholderComms from './ui/StakeholderComms';
 import PostMortem from './ui/PostMortem';
 import PagerAlert from './ui/PagerAlert';
 import IncidentTimeline from './ui/IncidentTimeline';
@@ -292,7 +291,11 @@ function App() {
         <div className="left-column" style={{ width: `${leftPanel.width}px` }}>
           <IncidentFeed
             incidents={state.activeIncidents}
+            stakeholderMessages={state.stakeholderMessages}
             onSelectIncident={setSelectedIncident}
+            onRespondStakeholder={(messageId, idx) =>
+              dispatch({ type: 'RESPOND_STAKEHOLDER', messageId, responseIndex: idx })
+            }
             selectedIncidentId={selectedIncident}
           />
         </div>
@@ -359,12 +362,7 @@ function App() {
 
       {/* === Enhancement Overlays === */}
 
-      {/* Stakeholder Communications */}
-      <StakeholderComms
-        state={state}
-        onRespond={(messageId, idx) => dispatch({ type: 'RESPOND_STAKEHOLDER', messageId, responseIndex: idx })}
-        onDismiss={(messageId) => dispatch({ type: 'DISMISS_STAKEHOLDER', messageId })}
-      />
+      {/* Stakeholder Communications — now rendered inside IncidentFeed */}
 
       {/* Pager Alert */}
       <PagerAlert

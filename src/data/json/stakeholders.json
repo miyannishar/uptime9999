@@ -1,0 +1,145 @@
+{
+  "personas": [
+    {
+      "id": "ceo",
+      "character": "CEO",
+      "icon": "🧑‍💼",
+      "cooldownMs": 120000,
+      "trigger": { "maxReputation": 45, "minCrits": 2, "minElapsedSec": 60 }
+    },
+    {
+      "id": "cto",
+      "character": "CTO",
+      "icon": "👩‍💻",
+      "cooldownMs": 90000,
+      "trigger": { "minCrits": 2, "minTechDebt": 60, "minIncidents": 5, "minElapsedSec": 90 }
+    },
+    {
+      "id": "vp_sales",
+      "character": "VP Sales",
+      "icon": "💰",
+      "cooldownMs": 150000,
+      "trigger": { "maxReputation": 55, "minUsers": 500 }
+    },
+    {
+      "id": "enterprise_customer",
+      "character": "Enterprise Customer",
+      "icon": "📧",
+      "cooldownMs": 180000,
+      "trigger": { "maxUptime": 0.99, "minElapsedSec": 120 }
+    },
+    {
+      "id": "junior_sre",
+      "character": "Junior SRE",
+      "icon": "🧑‍🔧",
+      "cooldownMs": 120000,
+      "trigger": { "minCrits": 1, "minElapsedSec": 30, "maxBurnout": 50 }
+    }
+  ],
+  "messages": {
+    "ceo": [
+      "The board is asking me about this outage. I need a clear ETA — investors are watching.",
+      "Our stock price is taking a hit. When will systems be back to normal?",
+      "I just got off a call with our biggest client. They're NOT happy. What's the status?",
+      "I'm seeing red on every dashboard. Is this as bad as it looks?",
+      "The press is starting to pick up on our downtime. We need this fixed NOW.",
+      "Investors asked me directly why uptime is below SLA. I need answers before the board meeting.",
+      "Revenue is already down 8% from this incident. Every minute costs us.",
+      "Our biggest competitor just tweeted about our outage. This is a PR disaster.",
+      "I have a call with the Series B lead in 2 hours. I need this fixed before then.",
+      "Enterprise clients have an SLA clause. We could be paying penalties. Fix this."
+    ],
+    "cto": [
+      "I'm seeing correlated failures across multiple services. Have we identified the root cause?",
+      "Our error budget for this quarter is almost exhausted. We need to stabilize.",
+      "The architecture can't keep handling this load pattern. We need to discuss scaling.",
+      "I've been reviewing the incident patterns — we're seeing the same failure mode repeat.",
+      "Our tech debt is catching up with us. We need to carve out time for reliability work.",
+      "I did a quick post-mortem analysis. There are three systemic issues we must address.",
+      "The database connection pool design is fundamentally flawed. This WILL happen again.",
+      "We need circuit breakers everywhere. This cascade failure was entirely preventable.",
+      "I'm blocking all non-critical deploys until we have 5 nines for 72 hours straight.",
+      "This incident would never have happened with proper observability. We're flying blind."
+    ],
+    "vp_sales": [
+      "I have three enterprise deals about to close and they're asking about our uptime numbers.",
+      "Customer churn is accelerating. Sales can't close deals when prospects see our status page.",
+      "Our competitors are using our outage in their sales pitches. Get this under control.",
+      "I need you to update the status page honestly. Customers trust transparency more than spin.",
+      "I had to cancel a demo because our API was down. That's a $200k deal at risk.",
+      "Five prospects asked me about the outage this morning. I'm running out of answers.",
+      "We're about to lose TechCorp if you don't give me something concrete to tell them.",
+      "I need an official incident report in the next 30 minutes for our enterprise customer calls.",
+      "The sales pipeline is frozen. Everyone is waiting to see if we can keep systems stable.",
+      "Just had a prospect tell me they chose a competitor specifically because of our reliability issues."
+    ],
+    "enterprise_customer": [
+      "Hi, our production pipeline depends on your API. We're seeing 500 errors on every request.",
+      "We're evaluating our contract renewal and this downtime is concerning.",
+      "Our SLA agreement guarantees 99.9% uptime. We're well below that this month.",
+      "Multiple teams at our company are blocked. We need a realistic timeline.",
+      "Our engineers are reporting complete API unavailability for the last 20 minutes.",
+      "This is the third incident in two months. We need to have a serious conversation about reliability.",
+      "We process 50,000 transactions a day through your API. Every minute of downtime costs us.",
+      "I'm escalating this to our legal team to review our SLA agreement if uptime doesn't improve.",
+      "Our CEO is asking me to find an alternative vendor. Please give me a reason to keep using you.",
+      "Is there a status page we can subscribe to? We're getting blindsided by these incidents."
+    ],
+    "junior_sre": [
+      "Hey, I'm on-call and seeing alerts I've never dealt with before. Should I restart the pods?",
+      "The runbook says to escalate after 15 minutes but I'm not sure if this is a P1.",
+      "I think I found the issue but I'm scared to push the fix to production without review.",
+      "The monitoring dashboard is all red but I can't tell which alert is the root cause.",
+      "I've tried the standard remediation steps twice and nothing is working. Help?",
+      "Alert storm is making it impossible to find the signal. How do I know what to focus on?",
+      "My blast radius analysis suggests rolling back the last deploy but I want confirmation.",
+      "Customer impact is spreading. I have 12 open tickets. Should I declare a major incident?",
+      "I found a fix but it requires a DB migration. Is it safe to run during an incident?",
+      "The automated rollback script failed. I've never done a manual rollback before."
+    ]
+  },
+  "responses": {
+    "ceo": [
+      { "text": "We're actively investigating. ETA within 10 minutes.", "effect": "promise_eta" },
+      { "text": "It's under control. No need to worry.", "effect": "dismiss" },
+      { "text": "This is serious. I'll provide updates every 5 minutes.", "effect": "transparent" }
+    ],
+    "cto": [
+      { "text": "Agreed — I'll file a tech debt ticket after this incident.", "effect": "tech_debt_commit" },
+      { "text": "Root cause identified. Implementing fix now.", "effect": "confidence" },
+      { "text": "We need to discuss this post-incident. Not now.", "effect": "defer" }
+    ],
+    "vp_sales": [
+      { "text": "I'll update the status page with accurate information now.", "effect": "status_page_update" },
+      { "text": "Tell customers it's a planned maintenance window.", "effect": "lie" },
+      { "text": "I'll prepare an incident summary for customer-facing teams.", "effect": "report" }
+    ],
+    "enterprise_customer": [
+      { "text": "We're aware and actively working on it. I'll send a detailed update shortly.", "effect": "acknowledge" },
+      { "text": "Apologies for the disruption. Crediting your account for downtime.", "effect": "credit" },
+      { "text": "This is within our SLA parameters. No action needed.", "effect": "deflect" }
+    ],
+    "junior_sre": [
+      { "text": "Good instinct! Check the upstream dependency first.", "effect": "mentor" },
+      { "text": "Escalate to me. I'll handle it.", "effect": "take_over" },
+      { "text": "Follow the runbook step by step. You've got this.", "effect": "encourage" }
+    ]
+  },
+  "effects": {
+    "promise_eta":         { "rep": 3,  "burnout": 5,  "debt": 0,  "cash": 0 },
+    "dismiss":             { "rep": -5, "burnout": -2, "debt": 0,  "cash": 0 },
+    "transparent":         { "rep": 5,  "burnout": 3,  "debt": 0,  "cash": 0 },
+    "tech_debt_commit":    { "rep": 2,  "burnout": 0,  "debt": -5, "cash": 0 },
+    "confidence":          { "rep": 4,  "burnout": 2,  "debt": 0,  "cash": 0 },
+    "defer":               { "rep": -2, "burnout": -3, "debt": 3,  "cash": 0 },
+    "status_page_update":  { "rep": 5,  "burnout": 2,  "debt": 0,  "cash": 0 },
+    "lie":                 { "rep": -10,"burnout": -2, "debt": 0,  "cash": 0 },
+    "report":              { "rep": 3,  "burnout": 5,  "debt": 0,  "cash": 0 },
+    "acknowledge":         { "rep": 4,  "burnout": 2,  "debt": 0,  "cash": 0 },
+    "credit":              { "rep": 6,  "burnout": 0,  "debt": 0,  "cash": -2000 },
+    "deflect":             { "rep": -8, "burnout": -2, "debt": 0,  "cash": 0 },
+    "mentor":              { "rep": 3,  "burnout": 5,  "debt": -2, "cash": 0 },
+    "take_over":           { "rep": 0,  "burnout": 8,  "debt": 0,  "cash": 0 },
+    "encourage":           { "rep": 2,  "burnout": -3, "debt": 0,  "cash": 0 }
+  }
+}
