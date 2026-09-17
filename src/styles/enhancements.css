@@ -691,11 +691,11 @@
 }
 .war-room-icon {
   font-size: 14px;
-  animation: warRoomBlink 0.5s step-end infinite;
+  animation: warRoomBlink 0.8s ease-in-out infinite;
 }
 @keyframes warRoomBlink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  50% { opacity: 0.3; }
 }
 .war-room-text {
   font-size: 13px;

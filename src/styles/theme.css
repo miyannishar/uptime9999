@@ -156,7 +156,12 @@ body {
   font-weight: 700;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 .speed-btn:hover {
   color: #c8d6e5;
@@ -175,7 +180,12 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
   white-space: nowrap;
 }
 
@@ -189,7 +199,6 @@ body {
   background: linear-gradient(135deg, var(--interactive), var(--status-info));
   color: var(--bg-base);
   font-weight: 700;
-  animation: pulse 2s infinite;
 }
 
 /* AI Status Indicator (non-clickable) */
@@ -216,7 +225,6 @@ body {
   background: var(--bg-elevated);
   color: var(--text-secondary);
   border-color: var(--border-default);
-  animation: pulse 1.5s infinite;
 }
 
 @keyframes aiActivePulse {
@@ -237,7 +245,12 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
   min-width: 35px;
 }
 
@@ -404,7 +417,12 @@ body {
   border-left: 3px solid var(--interactive);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .incident-item:hover {
@@ -551,7 +569,12 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .map-control-button:hover {
@@ -632,48 +655,12 @@ body {
 }
 
 .scale-pulse {
-  animation: scalePulse 1.5s infinite;
+  animation: node-scaled 2s ease-in-out infinite;
 }
 
-@keyframes scalePulse {
+@keyframes node-scaled {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
-}
-
-.scale-border-glow {
-  animation: scaleBorderGlow 2s infinite;
-}
-
-@keyframes scaleBorderGlow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
-}
-
-.scale-badge-glow {
-  animation: scaleBadgeGlow 2s infinite;
-}
-
-@keyframes scaleBadgeGlow {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.4; }
-}
-
-.scale-icon {
-  animation: scaleIconPulse 2s infinite;
-}
-
-@keyframes scaleIconPulse {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1px); }
-}
-
-.scale-count-pulse {
-  animation: scaleCountPulse 1.5s infinite;
-}
-
-@keyframes scaleCountPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
 }
 
 /* Node metrics styling */
@@ -712,7 +699,12 @@ body {
   font-size: 0.9rem;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .tab-button:hover {
@@ -835,7 +827,12 @@ body {
   cursor: pointer;
   border-radius: 4px;
   text-align: left;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .action-button:hover:not(:disabled) {
@@ -869,7 +866,6 @@ body {
 .action-button.resolution.in-progress {
   border-left-color: var(--status-warn);
   background: var(--bg-surface);
-  animation: pulse 1.5s infinite;
 }
 
 .no-actions {
@@ -944,7 +940,12 @@ body {
   cursor: pointer;
   border-radius: 4px;
   min-width: 140px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -1314,7 +1315,12 @@ body {
   border-radius: 4px;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
   font-weight: 600;
 }
 
@@ -1356,7 +1362,12 @@ body {
   font-size: 1.2rem;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .music-toggle:hover {
@@ -1373,7 +1384,12 @@ body {
   font-size: 0.9rem;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .music-control-btn:hover {
@@ -1578,7 +1594,12 @@ body {
   font-family: var(--font-data);
   cursor: pointer;
   border-radius: 3px;
-  transition: all 0.2s;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
 
 .view-logs-button:hover {
