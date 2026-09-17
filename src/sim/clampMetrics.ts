@@ -31,21 +31,18 @@ export function clampMetric(node: ComponentNode, metricKey: string, value: numbe
     return Math.max(0, Math.min(100, value));
   }
 
-  // Connections - must be <= maxConnections
-  if (metricKey === 'connections' && 'maxConnections' in metrics && typeof metrics.maxConnections === 'number') {
-    return Math.max(0, Math.min(metrics.maxConnections, Math.round(value)));
+  // Capped metrics: value must not exceed a sibling field on the same node
+  const capTo = (capKey: string, round = false) => {
+    const cap = metrics[capKey];
+    if (typeof cap !== 'number') return null;
+    const clamped = Math.max(0, Math.min(cap, value));
+    return round ? Math.round(clamped) : clamped;
+  };
+  if (metricKey === 'connections' || metricKey === 'concurrentConnections') {
+    const c = capTo('maxConnections', true); if (c !== null) return c;
   }
-  if (metricKey === 'concurrentConnections' && 'maxConnections' in metrics && typeof metrics.maxConnections === 'number') {
-    return Math.max(0, Math.min(metrics.maxConnections, Math.round(value)));
-  }
-
-  // Size metrics - must be <= maxSize
-  if (metricKey === 'sizeGB' && 'maxSizeGB' in metrics && typeof metrics.maxSizeGB === 'number') {
-    return Math.max(0, Math.min(metrics.maxSizeGB, value));
-  }
-  if (metricKey === 'storageGB' && 'maxStorageGB' in metrics && typeof metrics.maxStorageGB === 'number') {
-    return Math.max(0, Math.min(metrics.maxStorageGB, value));
-  }
+  if (metricKey === 'sizeGB') { const c = capTo('maxSizeGB'); if (c !== null) return c; }
+  if (metricKey === 'storageGB') { const c = capTo('maxStorageGB'); if (c !== null) return c; }
 
   // Queue depth - must be <= maxQueueDepth
   if (metricKey === 'messagesQueued' && 'maxQueueDepth' in metrics && typeof metrics.maxQueueDepth === 'number') {

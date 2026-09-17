@@ -329,14 +329,27 @@ function propagateLoad(state: GameState, ingressRPS: number) {
   }
 }
 
+type EffectMaps = {
+  healthDecay: Map<string, number>;
+  errorMult: Map<string, number>;
+  latencyMult: Map<string, number>;
+  utilMult: Map<string, number>;
+};
+
+function emptyEffectMaps(): EffectMaps {
+  return { healthDecay: new Map(), errorMult: new Map(), latencyMult: new Map(), utilMult: new Map() };
+}
+
+function mitigationFactor(incident: import('./types').ActiveIncident, mitigatedIds: Set<string>): number {
+  const immediate = mitigatedIds.has(incident.id) ? GAME_CONFIG.incidents.immediateMitigationOnActionStart : 0;
+  return 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediate);
+}
+
+
+
 function applyIncidentEffects(state: GameState, dt: number) {
   const { nodes } = state.architecture;
-
-  // Track cumulative effects per node to prevent stacking
-  const nodeHealthDecay = new Map<string, number>();
-  const nodeErrorMult = new Map<string, number>();
-  const nodeLatencyMult = new Map<string, number>();
-  const nodeUtilMult = new Map<string, number>();
+  const maps = emptyEffectMaps();
 
   // O2: Pre-build set of incident IDs currently being mitigated for O(1) lookups
   const mitigatedIncidentIds = new Set<string>(
@@ -357,14 +370,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
         continue;
       }
 
-      // O2: Use pre-built set instead of scanning actionsInProgress
-      const hasMitigatingAction = mitigatedIncidentIds.has(incident.id);
-      
-      // Apply immediate mitigation if action is in progress
-      const immediateMitigation = hasMitigatingAction 
-        ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
-        : 0;
-      const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
+      const mf = mitigationFactor(incident, mitigatedIncidentIds);
 
       // O5: aiEffects is already typed on ActiveIncident — no cast needed
       const aiEffects = incident.aiEffects;
@@ -372,24 +378,24 @@ function applyIncidentEffects(state: GameState, dt: number) {
       // Apply AI-specified effects if available
       if (aiEffects) {
         if (aiEffects.errorMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.errorMultiplier - 1) * mitigationFactor;
-          const current = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.errorMultiplier - 1) * mf;
+          const current = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.latencyMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.latencyMultiplier - 1) * mitigationFactor;
-          const current = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.latencyMultiplier - 1) * mf;
+          const current = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.utilizationMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.utilizationMultiplier - 1) * mitigationFactor;
-          const current = nodeUtilMult.get(incident.targetNodeId) || 1;
-          nodeUtilMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.utilizationMultiplier - 1) * mf;
+          const current = maps.utilMult.get(incident.targetNodeId) || 1;
+          maps.utilMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.healthDecayPerSec) {
-          const decay = aiEffects.healthDecayPerSec * mitigationFactor;
-          const current = nodeHealthDecay.get(incident.targetNodeId) || 0;
-          nodeHealthDecay.set(incident.targetNodeId, current + decay);
+          const decay = aiEffects.healthDecayPerSec * mf;
+          const current = maps.healthDecay.get(incident.targetNodeId) || 0;
+          maps.healthDecay.set(incident.targetNodeId, current + decay);
         }
         
         // Apply component-specific metric effects
@@ -418,7 +424,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
                 
                 // Apply gradually over time (effectValue represents target change over ~10 seconds)
                 // So we apply 10% of the effect per second
-                const effectiveChange = (clampedEffect * 0.1) * mitigationFactor * dt;
+                const effectiveChange = (clampedEffect * 0.1) * mf * dt;
                 const newValue = currentValue + effectiveChange;
                 targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
               }
@@ -428,20 +434,20 @@ function applyIncidentEffects(state: GameState, dt: number) {
       } else {
         // Fallback: Apply effects based on severity
         if (incident.severity === 'CRIT') {
-          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 3.0 * mitigationFactor));
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 2.5 * mitigationFactor));
-          const currentDecay = nodeHealthDecay.get(incident.targetNodeId) || 0;
-          nodeHealthDecay.set(incident.targetNodeId, currentDecay + 0.02 * mitigationFactor);
+          const currentErr = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, currentErr * (1 + 3.0 * mf));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 2.5 * mf));
+          const currentDecay = maps.healthDecay.get(incident.targetNodeId) || 0;
+          maps.healthDecay.set(incident.targetNodeId, currentDecay + 0.02 * mf);
         } else if (incident.severity === 'WARN') {
-          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 1.5 * mitigationFactor));
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.3 * mitigationFactor));
+          const currentErr = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, currentErr * (1 + 1.5 * mf));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 1.3 * mf));
         } else if (incident.severity === 'INFO') {
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.1 * mitigationFactor));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 1.1 * mf));
         }
       }
       
@@ -455,37 +461,30 @@ function applyIncidentEffects(state: GameState, dt: number) {
     const targetNode = nodes.get(targetNodeId);
     if (!targetNode) continue;
 
-    // O2: Use pre-built set instead of scanning actionsInProgress
-    const hasMitigatingAction = mitigatedIncidentIds.has(incident.id);
-    
-    // Apply immediate mitigation if action is in progress
-    const immediateMitigation = hasMitigatingAction 
-      ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
-      : 0;
-    const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
+    const mf = mitigationFactor(incident, mitigatedIncidentIds);
 
     const effects = incidentDef.effects;
 
     // Collect effects (to be applied in second pass with caps)
     if (effects.utilizationMultiplier) {
-      const effectiveMultiplier = 1 + (effects.utilizationMultiplier - 1) * mitigationFactor;
-      const current = nodeUtilMult.get(targetNodeId) || 1;
-      nodeUtilMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.utilizationMultiplier - 1) * mf;
+      const current = maps.utilMult.get(targetNodeId) || 1;
+      maps.utilMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.latencyMultiplier) {
-      const effectiveMultiplier = 1 + (effects.latencyMultiplier - 1) * mitigationFactor;
-      const current = nodeLatencyMult.get(targetNodeId) || 1;
-      nodeLatencyMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.latencyMultiplier - 1) * mf;
+      const current = maps.latencyMult.get(targetNodeId) || 1;
+      maps.latencyMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.errorMultiplier) {
-      const effectiveMultiplier = 1 + (effects.errorMultiplier - 1) * mitigationFactor;
-      const current = nodeErrorMult.get(targetNodeId) || 1;
-      nodeErrorMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.errorMultiplier - 1) * mf;
+      const current = maps.errorMult.get(targetNodeId) || 1;
+      maps.errorMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.healthDecayPerSec) {
-      const decay = effects.healthDecayPerSec * mitigationFactor;
-      const current = nodeHealthDecay.get(targetNodeId) || 0;
-      nodeHealthDecay.set(targetNodeId, current + decay);
+      const decay = effects.healthDecayPerSec * mf;
+      const current = maps.healthDecay.get(targetNodeId) || 0;
+      maps.healthDecay.set(targetNodeId, current + decay);
     }
     if (effects.capacityMultiplier) {
       // Store original capacity for restoration (only once)
@@ -557,33 +556,37 @@ function applyIncidentEffects(state: GameState, dt: number) {
     }
   }
 
-  // Second pass: Apply collected effects with caps to prevent death spiral
+  // Second pass: apply accumulated effects with caps
+  applyAccumulatedEffects(state, maps, dt);
+}
+
+function applyAccumulatedEffects(state: GameState, maps: EffectMaps, dt: number) {
+  const { nodes } = state.architecture;
   const caps = GAME_CONFIG.incidents.aiEffectCaps;
-  
   nodes.forEach((node, nodeId) => {
     // Apply error multiplier (capped)
-    const errorMult = nodeErrorMult.get(nodeId);
+    const errorMult = maps.errorMult.get(nodeId);
     if (errorMult) {
       const cappedMult = Math.min(errorMult, caps.maxErrorMultiplier);
       node.errorRate *= cappedMult;
     }
 
     // Apply latency multiplier (capped)
-    const latencyMult = nodeLatencyMult.get(nodeId);
+    const latencyMult = maps.latencyMult.get(nodeId);
     if (latencyMult) {
       const cappedMult = Math.min(latencyMult, caps.maxLatencyMultiplier);
       node.latency *= cappedMult;
     }
 
     // Apply utilization multiplier (capped)
-    const utilMult = nodeUtilMult.get(nodeId);
+    const utilMult = maps.utilMult.get(nodeId);
     if (utilMult) {
       const cappedMult = Math.min(utilMult, caps.maxUtilizationMultiplier);
       node.utilization *= cappedMult;
     }
 
     // Apply health decay (capped per second, not per incident)
-    const healthDecay = nodeHealthDecay.get(nodeId);
+    const healthDecay = maps.healthDecay.get(nodeId);
     if (healthDecay) {
       const cappedDecay = Math.min(healthDecay, caps.maxHealthDecayPerSec);
       node.health = Math.max(0, node.health - cappedDecay * dt);

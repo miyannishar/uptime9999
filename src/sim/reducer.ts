@@ -44,7 +44,6 @@ export type GameAction =
   | { type: 'MITIGATE_INCIDENT'; incidentId: string; actionId: string }
   | { type: 'SET_AI_SESSION_ACTIVE'; active: boolean }
   | { type: 'TRACK_INCIDENT_TARGET'; nodeId: string }
-  | { type: 'SPAWN_AI_INCIDENT'; incident: any }
   | { type: 'NEW_GAME'; seed: string }
   | { type: 'LOAD_GAME'; state: GameState }
   // Partial update. Takes an updater, not a literal, so batched dispatches in one tick
@@ -108,9 +107,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           { nodeId: action.nodeId, timestamp: Date.now() }
         ].slice(-5), // Keep only last 5 targets
       };
-
-    case 'SPAWN_AI_INCIDENT':
-      return spawnAIIncident(state, action.incident);
 
     case 'NEW_GAME':
       return state; // Handled in App component
@@ -770,95 +766,6 @@ function executeAIAction(
   return newState;
 }
 
-function spawnAIIncident(state: GameState, aiIncident: any): GameState {
-  // Generate truly unique ID using timestamp + random
-  const uniqueId = `ai_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  
-  // O5: aiIncidentName is typed on ActiveIncident
-  const exists = state.activeIncidents.some(i => 
-    i.aiGenerated && i.aiIncidentName === aiIncident.incidentName
-  );
-  
-  if (exists) {
-    return state;
-  }
-  
-  // Check for related incidents (same target + similar category within last 60s)
-  const now = Date.now();
-  const relatedIncidents = state.activeIncidents.filter(i => 
-    i.aiGenerated &&
-    i.targetNodeId === aiIncident.targetNodeId &&
-    (i.aiCategory === aiIncident.category || 
-     // Cache/Database incidents are often related
-     (aiIncident.category === 'CACHE' && i.aiCategory === 'CACHE') ||
-     (aiIncident.category === 'DATABASE' && i.aiCategory === 'DATABASE') ||
-     (aiIncident.category === 'COMPUTE' && i.aiCategory === 'COMPUTE') ||
-     (aiIncident.category === 'QUEUE' && i.aiCategory === 'QUEUE')
-    ) &&
-    (now - i.startTime) < 60000 // Within last 60 seconds
-  );
-  
-  const newIncident: ActiveIncident = {
-    id: uniqueId,
-    definitionId: 'ai_generated',
-    targetNodeId: aiIncident.targetNodeId,
-    severity: aiIncident.severity,
-    startTime: Date.now(),
-    startSim: state.elapsedSim,
-    escalationTimer: 0,
-    outagetimer: aiIncident.autoResolveSeconds || 300,
-    mitigationLevel: 0,
-    mitigationProgress: 0,
-    aiGenerated: true,
-    aiIncidentName: aiIncident.incidentName,
-    aiDescription: aiIncident.description,
-    // The model returns logs as either a string or an array of lines; LogsModal does .split()
-    aiLogs: Array.isArray(aiIncident.logs) ? aiIncident.logs.join('\n') : aiIncident.logs || '',
-    aiSuggestedActions: aiIncident.suggestedActions,
-    aiEffects: aiIncident.effects,
-    aiCategory: aiIncident.category,
-    relatedIncidentIds: relatedIncidents.map(i => i.id),
-    rootCauseShared: relatedIncidents.length > 0,
-  };
-  
-  // M5 FIX: Link related incidents bidirectionally on cloned incident array
-  // We must not mutate the old state's incidents
-  if (relatedIncidents.length > 0) {
-    // spawnAIIncident returns a new state with cloned incidents, so we build it here
-    const clonedIncidents = state.activeIncidents.map(inc => {
-      const isRelated = relatedIncidents.some(r => r.id === inc.id);
-      if (isRelated) {
-        return {
-          ...inc,
-          relatedIncidentIds: [...(inc.relatedIncidentIds || []), uniqueId],
-          rootCauseShared: true,
-        };
-      }
-      return { ...inc };
-    });
-    
-    return {
-      ...state,
-      activeIncidents: [...clonedIncidents, newIncident],
-      totalIncidents: state.totalIncidents + 1,
-    };
-  }
-  
-  // Play sound based on severity
-  if (aiIncident.severity === 'CRIT') {
-    soundNotifications.playIncidentCRIT();
-  } else if (aiIncident.severity === 'WARN') {
-    soundNotifications.playIncidentWARN();
-  } else {
-    soundNotifications.playIncidentINFO();
-  }
-  
-  return {
-    ...state,
-    activeIncidents: [...state.activeIncidents, newIncident],
-    totalIncidents: state.totalIncidents + 1,
-  };
-}
 
 function debugSpawnIncident(state: GameState, incidentId: string, targetNodeId: string): GameState {
   const incidentDef = INCIDENTS.find(i => i.id === incidentId);

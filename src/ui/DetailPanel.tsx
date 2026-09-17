@@ -379,9 +379,11 @@ export default function DetailPanel({
                       })
                     ) : (
                       <>
-                        {!selectedIncident.aiGenerated && (
+                        {!selectedIncident.aiGenerated && (() => {
+                          const resolutions = getResolutionActions(selectedIncident);
+                          return (
                           <div className="suggested-actions">
-                            {getResolutionActions(selectedIncident).map(action => {
+                            {resolutions.map(action => {
                               const canExecute = canExecuteAction(action.id);
                               const cooldown = getCooldownRemaining(action.id);
                               const activeAction = state.actionsInProgress.find(
@@ -418,11 +420,12 @@ export default function DetailPanel({
                                 </button>
                               );
                             })}
-                            {getResolutionActions(selectedIncident).length === 0 && (
+                            {resolutions.length === 0 && (
                               <p className="no-actions">This incident auto-resolves over time</p>
                             )}
                           </div>
-                        )}
+                          );
+                        })()}
                       </>
                     )}
                   </div>
