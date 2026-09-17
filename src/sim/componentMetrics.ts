@@ -177,7 +177,7 @@ export interface ObservabilityMetrics {
 }
 
 // Union type for all component-specific metrics
-export type ComponentSpecificMetrics = 
+export type ComponentSpecificMetrics =
   | DNSMetrics
   | CDNMetrics
   | WAFMetrics
@@ -192,5 +192,22 @@ export type ComponentSpecificMetrics =
   | ServiceMeshMetrics
   | ObservabilityMetrics;
 
-
+// Default metric baselines for recovery (derived from componentInitializer initial values)
+export const METRIC_BASELINES: Record<string, Record<string, number>> = {
+  DNS: { cacheHitRate: 0.85, ttl: 300, propagationDelay: 5 },
+  CDN: { cacheHitRate: 0.75, bandwidthGbps: 1.0, cacheSizeGB: 10, ttl: 3600 },
+  WAF: { blockedRequestsPercent: 0.01, inspectionLatency: 2, falsePositiveRate: 0.001 },
+  GLB: { healthCheckInterval: 5, failedHealthChecks: 0 },
+  RLB: { healthCheckInterval: 5, failedHealthChecks: 0 },
+  APIGW: { rateLimitHitRate: 0, transformationLatency: 5 },
+  APP: { avgCPUPercent: 0, avgMemoryPercent: 0 },
+  CACHE: { hitRate: 0.85, evictionRate: 0, memoryFragmentation: 0.05, avgTTL: 300 },
+  QUEUE: { messagesQueued: 0, avgMessageAge: 0, deadLetterQueueSize: 0 },
+  WORKERS: { failedJobsPercent: 0, queueBacklog: 0, avgJobDuration: 2 },
+  DB_PRIMARY: { slowQueriesPercent: 0, replicationLag: 0, cacheHitRate: 0.80, indexEfficiency: 0.95 },
+  DB_REPLICA: { slowQueriesPercent: 0, replicationLag: 0, cacheHitRate: 0.80, indexEfficiency: 0.95 },
+  OBJECT_STORAGE: { coldStoragePercent: 0 },
+  OBSERVABILITY: { queryLatency: 50 },
+  SERVICE_MESH: { circuitBreakersOpen: 0, retryRate: 0.05, sidecarOverhead: 5 },
+};
 

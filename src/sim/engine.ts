@@ -13,6 +13,7 @@ import {
   computeReputationDelta,
   computeAlertFatigueGrowth,
 } from './formulas';
+import { METRIC_BASELINES } from './componentMetrics';
 import { INCIDENTS } from '../data/incidents';
 import { ACTIONS } from '../data/actions';
 import { createMinimalArchitecture, deployComponent } from '../data/architecture';
@@ -131,26 +132,8 @@ export function createInitialState(seed: string): GameState {
 }
 
 // Default metric baselines for recovery (derived from architecture.ts initial values)
-const DEFAULT_METRIC_BASELINES: Record<string, Record<string, number>> = {
-  DNS: { cacheHitRate: 0.85, ttl: 300, propagationDelay: 5 },
-  CDN: { cacheHitRate: 0.75, bandwidthGbps: 10, cacheSizeGB: 500, ttl: 300 },
-  WAF: { blockedRequestsPercent: 0.01, inspectionLatency: 5, falsePositiveRate: 0.001 },
-  GLB: { healthCheckInterval: 5, failedHealthChecks: 0 },
-  RLB: { healthCheckInterval: 3, failedHealthChecks: 0 },
-  APIGW: { rateLimitHitRate: 0.01, transformationLatency: 5 },
-  APP: { avgCPUPercent: 30, avgMemoryPercent: 40 },
-  CACHE: { hitRate: 0.80, evictionRate: 10, memoryFragmentation: 0.15, avgTTL: 300 },
-  QUEUE: { messagesQueued: 0, avgMessageAge: 2, deadLetterQueueSize: 0 },
-  WORKERS: { failedJobsPercent: 0.01, queueBacklog: 0, avgJobDuration: 10 },
-  DB_PRIMARY: { slowQueriesPercent: 0.05, replicationLag: 0, cacheHitRate: 0.70, indexEfficiency: 0.85 },
-  DB_REPLICA: { slowQueriesPercent: 0.05, replicationLag: 100, cacheHitRate: 0.70, indexEfficiency: 0.85 },
-  OBJECT_STORAGE: { coldStoragePercent: 0.2 },
-  OBSERVABILITY: { queryLatency: 100 },
-  SERVICE_MESH: { circuitBreakersOpen: 0, retryRate: 0, sidecarOverhead: 3 },
-};
-
 function getDefaultMetricValue(nodeType: string, metricKey: string): number | null {
-  const baselines = DEFAULT_METRIC_BASELINES[nodeType];
+  const baselines = METRIC_BASELINES[nodeType];
   if (baselines && metricKey in baselines) {
     return baselines[metricKey];
   }
