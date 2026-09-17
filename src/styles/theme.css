@@ -7,15 +7,10 @@
 }
 
 body {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
   background: var(--bg-base);
   color: var(--text-primary);
   overflow: hidden;
   overflow-y: auto; /* CSS-5 FIX: Allow vertical scrolling on short viewports */
-}
-
-.mono {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 .app {
@@ -85,7 +80,7 @@ body {
 }
 
 .hud-value {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--interactive);
@@ -478,7 +473,7 @@ body {
   padding: 0.1rem 0.4rem;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -497,7 +492,7 @@ body {
 .incident-target {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
 }
 
 .mitigation-bar {
@@ -566,7 +561,7 @@ body {
 }
 
 .zoom-indicator {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.75rem;
   color: var(--text-secondary);
   padding: 0.4rem 0.8rem;
@@ -768,7 +763,7 @@ body {
 }
 
 .stat-value {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.9rem;
 }
 
@@ -807,7 +802,7 @@ body {
 }
 
 .metric-value {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.85rem;
   color: var(--interactive);
   font-weight: 600;
@@ -864,7 +859,7 @@ body {
 .action-cost {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
 }
 
 .action-button.resolution {
@@ -1001,7 +996,7 @@ body {
   color: white;
   border-radius: 3px;
   font-size: 0.7rem;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
 }
 
 .action-progress {
@@ -1088,13 +1083,13 @@ body {
 .activity-target {
   color: var(--text-secondary);
   font-size: 0.8rem;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
 }
 
 .activity-time {
   margin-left: auto;
   color: var(--interactive);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.8rem;
 }
 
@@ -1150,7 +1145,7 @@ body {
   padding: 0.5rem 1rem;
   background: #1a1a1a;
   border-bottom: 1px solid #333;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.75rem;
   color: #888;
 }
@@ -1163,7 +1158,7 @@ body {
   flex: 1;
   padding: 1rem;
   overflow-y: auto;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.85rem;
   line-height: 1.6;
 }
@@ -1294,7 +1289,7 @@ body {
 
 .summary-value {
   font-size: 1.1rem;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   color: var(--interactive);
   font-weight: 600;
 }
@@ -1455,7 +1450,7 @@ body {
 }
 
 .volume-display {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-size: 0.85rem;
   color: var(--interactive);
   min-width: 40px;
@@ -1498,7 +1493,7 @@ body {
   border-radius: 3px;
   font-size: 0.75rem;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
 }
 
 .severity-badge.severity-info {
@@ -1522,7 +1517,7 @@ body {
 }
 
 .related-incident-progress {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   color: var(--interactive);
   font-weight: 600;
 }
@@ -1580,7 +1575,7 @@ body {
   border: 1px solid var(--status-info);
   color: var(--status-info);
   font-size: 0.75rem;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data);
   cursor: pointer;
   border-radius: 3px;
   transition: all 0.2s;
@@ -1602,4 +1597,29 @@ button:focus-visible,
   outline: 2px solid var(--interactive);
   outline-offset: 2px;
 }
+
+/* ── FONT ROLE ASSIGNMENTS ──────────────────────────────────────
+   UI chrome uses --font-ui (Space Grotesk).
+   Numeric data, code, and terminal content use --font-data (JetBrains Mono). */
+
+.hud-value,
+.stat-value,
+.metric-value,
+.activity-time,
+.incident-time,
+.action-cost,
+.action-cooldown,
+.zoom-indicator,
+.terminal-body,
+.log-line,
+.cursor-blink,
+.terminal-title,
+.terminal-header,
+.volume-display,
+.summary-value {
+  font-family: var(--font-data);
+}
+
+/* Arch map SVG uses inline font — set via ArchMap.tsx renderComponentSpecificMetrics */
+/* Node name text in SVG is also set inline in ArchMap.tsx — updated in Task E5 */
 

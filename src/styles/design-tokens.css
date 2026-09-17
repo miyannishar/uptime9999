@@ -61,6 +61,11 @@
   --z-pager:     300;
 }
 
+body {
+  font-family: var(--font-ui);
+  /* Note: --font-data is applied to specific data-display selectors below */
+}
+
 /* Reduced motion — one block covers the entire app */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
