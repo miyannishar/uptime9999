@@ -37,6 +37,7 @@ describe('incident damage', () => {
     vi.setSystemTime(1_700_000_000_000);
     const rng = new SeededRNG('rec');
     let s = createInitialState('rec');
+    s = { ...s, activeIncidents: [], totalIncidents: 0 }; // clear starters for isolation
     const app = s.architecture.nodes.get('app')!;
     app.health = 0.5;
     for (let i = 1; i <= 300; i++) {

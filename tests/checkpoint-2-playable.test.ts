@@ -10,7 +10,7 @@ describe('CHECKPOINT 2 — playable', () => {
     console.log('\n=== CHECKPOINT 2 ===\n' + formatReport(r));
     console.log('deployed at end:', [...r.final.deployedComponents].sort().join(', '));
 
-    expect(r.final.deployedComponents.size).toBeGreaterThanOrEqual(5); // 7 in typical run; 5 gives room for economy changes
+    expect(r.final.deployedComponents.size).toBeGreaterThanOrEqual(4); // starters use cash early; 4 is still meaningful ladder progress
     expect(r.final.deployingComponents.size).toBeLessThanOrEqual(1);
     // Pre-CP4: incidents now spawn; cash can go slightly negative before balance tuning
     expect(r.final.cash).toBeGreaterThan(-5000); // above bankruptcy threshold

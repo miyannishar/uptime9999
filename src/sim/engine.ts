@@ -26,6 +26,43 @@ import { soundNotifications } from '../utils/soundNotifications';
 import { applyRelatedMitigation } from './reducer';
 import { spawnFromTemplates } from './incidentSpawner';
 
+// Starter incidents seeded from the run seed so different runs open on different problems.
+// Using two WARN starters makes the game feel alive immediately without overwhelming the player.
+const STARTER_POOL = ['slow_queries', 'canary_failure', 'config_drift', 'third_party_api_slow',
+                      'node_reboot', 'memory_leak', 'cloud_region_brownout'];
+
+function buildStarterIncidents(seed: string, startTime: number) {
+  const rng = new SeededRNG(seed + '-starters');
+  const pool = [...STARTER_POOL];
+  const picks: string[] = [];
+  while (picks.length < 2 && pool.length > 0) {
+    const idx = Math.floor(rng.next() * pool.length);
+    picks.push(pool.splice(idx, 1)[0]);
+  }
+
+  return picks.map((defId, i) => {
+    const def = INCIDENTS.find(d => d.id === defId);
+    // Target the appropriate starting node for this incident
+    const targetMap: Record<string, string> = {
+      slow_queries: 'db_primary', memory_leak: 'app', cloud_region_brownout: 'app',
+      canary_failure: 'app', config_drift: 'app', third_party_api_slow: 'app', node_reboot: 'app',
+    };
+    return {
+      id: `starter_${defId}_${i}`,
+      definitionId: defId,
+      targetNodeId: targetMap[defId] ?? 'app',
+      severity: def?.severity ?? 'WARN',
+      startTime,
+      startSim: 0,
+      escalationTimer: def?.escalationTimeSeconds ?? 0,
+      outagetimer: 0,
+      // Partially mitigated so escalation check (mitigationLevel < 0.1) stays false
+      mitigationLevel: 0.15,
+      mitigationProgress: 0.15,
+    };
+  });
+}
+
 export function createInitialState(seed: string): GameState {
   const architecture = createMinimalArchitecture();
   const startTime = Date.now();
@@ -79,7 +116,7 @@ export function createInitialState(seed: string): GameState {
 
     observabilityLevel: GAME_CONFIG.starting.observabilityLevel,
 
-    activeIncidents: [],
+    activeIncidents: buildStarterIncidents(seed, startTime),
     resolvedIncidents: 0,
     resolveStreak: 0,
     bestStreak: 0,
@@ -107,7 +144,7 @@ export function createInitialState(seed: string): GameState {
     elapsedSim: 0,
 
     totalProfit: 0,
-    totalIncidents: 0,
+    totalIncidents: 2, // 2 starter incidents pre-seeded
 
     // Enhancement features
     statusPageLevel: 'operational',

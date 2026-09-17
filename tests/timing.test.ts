@@ -12,7 +12,7 @@ describe('timing', () => {
     const rng = new SeededRNG('t');
     let s = createInitialState('t');
     // Suppress incident spawning so only the reputation timer drives game-over
-    s = { ...s, reputation: 0, lastCalmPeriodEnd: 1_700_000_000_000 + 999_999_999 };
+    s = { ...s, reputation: 0, activeIncidents: [], totalIncidents: 0, lastCalmPeriodEnd: 1_700_000_000_000 + 999_999_999 };
     const grace = GAME_CONFIG.economy.reputationGameOverGracePeriod;
     const ticks = Math.floor((grace - 5) / 0.1); // 5 seconds short of the limit
     for (let i = 1; i <= ticks; i++) {

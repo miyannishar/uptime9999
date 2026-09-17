@@ -14,7 +14,7 @@ describe('CHECKPOINT 3 — build-and-optimise matters', () => {
     console.log(`peak util — builder ${peak(builder).toFixed(2)} vs idler ${peak(idler).toFixed(2)}`);
 
     // The load model is live for both (utilization isn't zero)
-    expect(peak(idler)).toBeGreaterThan(0.4);
+    expect(peak(idler)).toBeGreaterThan(0.2); // starters slow growth early
     // Building costs money (ongoing infra costs) — the economy is real
     expect(builder.final.costs).toBeGreaterThan(idler.final.costs);
     // The builder resolves incidents → more resolved incidents than the pure idler
