@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { GameState } from '../sim/types';
 
 interface IncidentTimelineProps {
@@ -7,16 +7,37 @@ interface IncidentTimelineProps {
 
 export default function IncidentTimeline({ state }: IncidentTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const scrollStartX = useRef(0);
   const now = Date.now();
   const sessionStart = state.startTime;
   const sessionDuration = now - sessionStart;
 
-  // Auto-scroll to the right (latest)
+  // Auto-scroll to the right only when the view is already pinned to the right edge.
+  // If the user has dragged left, they're browsing history — don't snap back.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    const el = scrollRef.current;
+    if (!el || isDragging) return;
+    const distFromRight = el.scrollWidth - el.clientWidth - el.scrollLeft;
+    if (distFromRight < 40) {
+      el.scrollLeft = el.scrollWidth;
     }
   });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    dragStartX.current = e.clientX;
+    scrollStartX.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    scrollRef.current.scrollLeft = scrollStartX.current - (e.clientX - dragStartX.current);
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
 
   // Combine active and historical incidents
   const allIncidents = [
@@ -46,7 +67,7 @@ export default function IncidentTimeline({ state }: IncidentTimelineProps) {
         <div className="timeline-header">
           <span className="timeline-title">Incident Timeline</span>
         </div>
-        <div className="timeline-empty">No incidents yet — enjoy the calm ☀️</div>
+        <div className="timeline-empty">No incidents yet</div>
       </div>
     );
   }
@@ -73,7 +94,14 @@ export default function IncidentTimeline({ state }: IncidentTimelineProps) {
           {state.incidentHistory.length} resolved · {state.activeIncidents.length} active
         </span>
       </div>
-      <div className="timeline-scroll" ref={scrollRef}>
+      <div
+        className={`timeline-scroll${isDragging ? ' dragging' : ''}`}
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <div className="timeline-track" style={{ width: `${timelineWidth}px` }}>
           {/* Time markers every 30 seconds */}
           {Array.from({ length: Math.floor(sessionDuration / 30000) + 1 }, (_, i) => {

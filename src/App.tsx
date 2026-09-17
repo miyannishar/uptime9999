@@ -56,7 +56,8 @@ function App() {
   const rightPanel = useResizable(
     GAME_CONFIG.ui.rightPanelWidth,
     GAME_CONFIG.ui.rightPanelMin,
-    GAME_CONFIG.ui.rightPanelMax
+    GAME_CONFIG.ui.rightPanelMax,
+    'rtl',
   );
   
   // Resizable bottom panel (vertical)

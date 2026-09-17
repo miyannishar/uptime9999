@@ -30,11 +30,17 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Zoom and pan state
-  const [zoom, setZoom] = useState(1.0);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(0.5);
+  const [pan, setPan] = useState({ x: 80, y: 40 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const lastPan = useRef({ x: 80, y: 40 });
+  const hasMoved = useRef(false);
+  // Refs for latest zoom/pan inside event handlers (avoids stale closures)
+  const zoomRef = useRef(0.5);
+  const panRef = useRef({ x: 80, y: 40 });
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panRef.current = pan; }, [pan]);
 
   // Deploy entrance animation (F2)
   const [recentlyDeployed, setRecentlyDeployed] = useState<Set<string>>(new Set());
@@ -275,53 +281,80 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
     );
   };
 
-  // Handle wheel zoom
+  // Compute fit-to-nodes zoom/pan for the current SVG size
+  const computeFit = () => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const { width: cw, height: ch } = svg.getBoundingClientRect();
+    if (!cw || !ch) return null;
+    const deployed = Array.from(nodes.keys()).map(id => positions[id]).filter(Boolean);
+    if (deployed.length === 0) return { zoom: 0.45, pan: { x: 60, y: 40 } };
+    const PAD = 80;
+    const NODE_W = 240;
+    const NODE_H = 160;
+    const minX = Math.min(...deployed.map(p => p.x)) - PAD;
+    const minY = Math.min(...deployed.map(p => p.y)) - PAD;
+    const maxX = Math.max(...deployed.map(p => p.x)) + NODE_W + PAD;
+    const maxY = Math.max(...deployed.map(p => p.y)) + NODE_H + PAD;
+    const boxW = maxX - minX;
+    const boxH = maxY - minY;
+    const newZoom = Math.min(cw / boxW, ch / boxH, 1.5);
+    return {
+      zoom: newZoom,
+      pan: { x: (cw - boxW * newZoom) / 2 - minX * newZoom, y: (ch - boxH * newZoom) / 2 - minY * newZoom },
+    };
+  };
+
+  // Fit on first paint
+  useEffect(() => {
+    const fit = computeFit();
+    if (fit) { setZoom(fit.zoom); setPan(fit.pan); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Wheel zoom toward cursor — uses refs to avoid stale closures
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
-
-    const handleWheel = (e: WheelEvent) => {
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.3, Math.min(3, zoom * delta));
+      const rect = svg.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.15, Math.min(4, zoomRef.current * factor));
+      const ratio = newZoom / zoomRef.current;
       setZoom(newZoom);
+      setPan({ x: mx - (mx - panRef.current.x) * ratio, y: my - (my - panRef.current.y) * ratio });
     };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, []); // empty — reads from refs
 
-    svg.addEventListener('wheel', handleWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', handleWheel);
-  }, [zoom]);
-
-  // Handle mouse drag for panning
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 0) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-      setLastPan(pan);
-    }
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    hasMoved.current = false;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    lastPan.current = panRef.current;
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isDragging) {
-      const deltaX = (e.clientX - dragStart.x) * 2;
-      const deltaY = (e.clientY - dragStart.y) * 2;
-      setPan({
-        x: lastPan.x + deltaX,
-        y: lastPan.y + deltaY,
-      });
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved.current = true;
+      setPan({ x: lastPan.current.x + dx, y: lastPan.current.y + dy });
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseLeave = () => setIsDragging(false);
 
   const handleReset = () => {
-    setZoom(1.0);
-    setPan({ x: 0, y: 0 });
+    const fit = computeFit();
+    if (fit) { setZoom(fit.zoom); setPan(fit.pan); }
   };
 
   return (
@@ -339,13 +372,12 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
       <svg
         ref={svgRef}
         className="arch-svg"
-        viewBox="0 0 2000 2000"
         xmlns="http://www.w3.org/2000/svg"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab', display: 'block' }}
       >
         <defs>
           <filter id="glow">
@@ -419,7 +451,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
             return (
               <g
                 key={node.id}
-                onClick={() => onSelectNode(node.id)}
+                onClick={() => { if (!hasMoved.current) onSelectNode(node.id); }}
                 style={{ cursor: 'pointer' }}
                 className={`node-group ${status === 'degraded' ? 'node-degraded' : ''} ${status === 'down' ? 'node-down' : ''} ${recentlyDeployed.has(node.id) ? 'node-entering' : ''}`}
               >

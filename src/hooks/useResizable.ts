@@ -1,6 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-export function useResizable(initialWidth: number, minWidth: number = 200, maxWidth: number = 800) {
+export function useResizable(
+  initialWidth: number,
+  minWidth: number = 200,
+  maxWidth: number = 800,
+  direction: 'ltr' | 'rtl' = 'ltr',  // ltr: drag right = grow; rtl: drag left = grow
+) {
   const [width, setWidth] = useState(initialWidth);
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
@@ -17,7 +22,7 @@ export function useResizable(initialWidth: number, minWidth: number = 200, maxWi
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const delta = e.clientX - startXRef.current;
+      const delta = (e.clientX - startXRef.current) * (direction === 'rtl' ? -1 : 1);
       const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidthRef.current + delta));
       setWidth(newWidth);
     };

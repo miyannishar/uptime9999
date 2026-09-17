@@ -491,51 +491,64 @@
 
 /* === Incident Timeline === */
 .incident-timeline {
-  background: rgba(10, 18, 30, 0.6);
-  border: 1px solid rgba(100, 180, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
-  margin: 6px 0;
-  max-height: 120px;
+  flex: 1;
+  background: var(--bg-surface);
+  border-top: 2px solid var(--interactive);
+  border-left: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  flex-shrink: 0;
+  min-width: 200px;
 }
 .timeline-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-  padding: 0 4px;
+  padding: 0.5rem 0.8rem 0.4rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
 }
 .timeline-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #8899aa;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--interactive);
 }
 .timeline-stats {
-  font-size: 11px;
-  color: #5a6a7a;
+  font-family: var(--font-data);
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }
 .timeline-empty {
-  text-align: center;
-  padding: 12px;
-  color: #5a6a7a;
-  font-size: 12px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 .timeline-scroll {
+  flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  height: 50px;
   position: relative;
+  cursor: grab;
+}
+.timeline-scroll.dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 .timeline-scroll::-webkit-scrollbar {
-  height: 4px;
+  height: 3px;
 }
 .timeline-scroll::-webkit-scrollbar-track {
-  background: rgba(30, 40, 60, 0.5);
+  background: transparent;
 }
 .timeline-scroll::-webkit-scrollbar-thumb {
-  background: rgba(100, 180, 255, 0.2);
+  background: var(--border-bright);
   border-radius: 2px;
 }
 .timeline-track {
