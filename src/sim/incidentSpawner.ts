@@ -1,5 +1,6 @@
 import { INCIDENTS } from '../data/incidents';
 import { GAME_CONFIG } from '../config/gameConfig';
+import { tlog } from '../utils/terminalLog';
 import type { SeededRNG } from './rng';
 import type { ActiveIncident, ComponentNode, GameState, IncidentDefinition } from './types';
 
@@ -61,6 +62,7 @@ export function spawnFromTemplates(state: GameState, rng: SeededRNG, dt: number)
     };
     state.activeIncidents.push(incident);
     state.totalIncidents++;
+    tlog.warn(`🚨 ${def.severity} | ${def.name} → ${target.name} (util ${target.utilization.toFixed(2)})`);
     if (state.activeIncidents.length >= cfg.maxConcurrent) return;
   }
 }
