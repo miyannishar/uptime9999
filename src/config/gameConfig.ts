@@ -206,14 +206,14 @@ export const GAME_CONFIG = {
 
   // === UI DEFAULTS ===
   ui: {
-    leftPanelWidth: 350,
-    leftPanelMin: 250,
-    leftPanelMax: 500,
-    rightPanelWidth: 380,
-    rightPanelMin: 300,
+    leftPanelWidth: 320,
+    leftPanelMin: 240,
+    leftPanelMax: 520,
+    rightPanelWidth: 300,
+    rightPanelMin: 240,
     rightPanelMax: 600,
-    bottomPanelHeight: 200,
-    bottomPanelMin: 150,
+    bottomPanelHeight: 220,
+    bottomPanelMin: 160,
     bottomPanelMax: 0.6, // 60% of window height
     activityLogWidth: 350,
   },

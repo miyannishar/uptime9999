@@ -241,8 +241,21 @@ export default function DetailPanel({
                 </div>
               </>
             ) : (
-              <div className="empty-state">
-                <p>Select a node from the map to view details</p>
+              <div className="empty-state" style={{ paddingTop: '4rem', textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '2rem',
+                  color: 'var(--text-muted)',
+                  opacity: 0.3,
+                  marginBottom: '0.75rem',
+                  lineHeight: 1,
+                }}>←</div>
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.6,
+                }}>
+                  Select a node or incident<br />to investigate
+                </div>
               </div>
             )}
           </div>
