@@ -3,42 +3,61 @@
     {
       "id": "ceo",
       "character": "CEO",
-      "icon": "🧑‍💼",
+      "icon": "\ud83e\uddd1\u200d\ud83d\udcbc",
       "cooldownMs": 120000,
-      "trigger": { "maxReputation": 45, "minCrits": 2, "minElapsedSec": 60 }
+      "trigger": {
+        "maxReputation": 45,
+        "minCrits": 2,
+        "minElapsedSec": 60
+      }
     },
     {
       "id": "cto",
       "character": "CTO",
-      "icon": "👩‍💻",
+      "icon": "\ud83d\udc69\u200d\ud83d\udcbb",
       "cooldownMs": 90000,
-      "trigger": { "minCrits": 2, "minTechDebt": 60, "minIncidents": 5, "minElapsedSec": 90 }
+      "trigger": {
+        "minCrits": 2,
+        "minTechDebt": 60,
+        "minIncidents": 5,
+        "minElapsedSec": 90
+      }
     },
     {
       "id": "vp_sales",
       "character": "VP Sales",
-      "icon": "💰",
+      "icon": "\ud83d\udcb0",
       "cooldownMs": 150000,
-      "trigger": { "maxReputation": 55, "minUsers": 500 }
+      "trigger": {
+        "maxReputation": 55,
+        "minUsers": 500
+      }
     },
     {
       "id": "enterprise_customer",
       "character": "Enterprise Customer",
-      "icon": "📧",
+      "icon": "\ud83d\udce7",
       "cooldownMs": 180000,
-      "trigger": { "maxUptime": 0.99, "minElapsedSec": 120 }
+      "trigger": {
+        "maxUptime": 0.99,
+        "minElapsedSec": 120
+      }
     },
     {
       "id": "junior_sre",
       "character": "Junior SRE",
-      "icon": "🧑‍🔧",
+      "icon": "\ud83e\uddd1\u200d\ud83d\udd27",
       "cooldownMs": 120000,
-      "trigger": { "minCrits": 1, "minElapsedSec": 30, "maxBurnout": 50 }
+      "trigger": {
+        "minCrits": 1,
+        "minElapsedSec": 30,
+        "maxBurnout": 50
+      }
     }
   ],
   "messages": {
     "ceo": [
-      "The board is asking me about this outage. I need a clear ETA — investors are watching.",
+      "The board is asking me about this outage. I need a clear ETA \u2014 investors are watching.",
       "Our stock price is taking a hit. When will systems be back to normal?",
       "I just got off a call with our biggest client. They're NOT happy. What's the status?",
       "I'm seeing red on every dashboard. Is this as bad as it looks?",
@@ -53,7 +72,7 @@
       "I'm seeing correlated failures across multiple services. Have we identified the root cause?",
       "Our error budget for this quarter is almost exhausted. We need to stabilize.",
       "The architecture can't keep handling this load pattern. We need to discuss scaling.",
-      "I've been reviewing the incident patterns — we're seeing the same failure mode repeat.",
+      "I've been reviewing the incident patterns \u2014 we're seeing the same failure mode repeat.",
       "Our tech debt is catching up with us. We need to carve out time for reliability work.",
       "I did a quick post-mortem analysis. There are three systemic issues we must address.",
       "The database connection pool design is fundamentally flawed. This WILL happen again.",
@@ -100,46 +119,379 @@
   },
   "responses": {
     "ceo": [
-      { "text": "We're actively investigating. ETA within 10 minutes.", "effect": "promise_eta" },
-      { "text": "It's under control. No need to worry.", "effect": "dismiss" },
-      { "text": "This is serious. I'll provide updates every 5 minutes.", "effect": "transparent" }
+      {
+        "text": "We're actively investigating. ETA within 10 minutes.",
+        "effect": "promise_eta",
+        "requiresTask": true
+      },
+      {
+        "text": "It's under control. No need to worry.",
+        "effect": "dismiss"
+      },
+      {
+        "text": "This is serious. I'll provide updates every 5 minutes.",
+        "effect": "transparent",
+        "requiresTask": true
+      }
     ],
     "cto": [
-      { "text": "Agreed — I'll file a tech debt ticket after this incident.", "effect": "tech_debt_commit" },
-      { "text": "Root cause identified. Implementing fix now.", "effect": "confidence" },
-      { "text": "We need to discuss this post-incident. Not now.", "effect": "defer" }
+      {
+        "text": "Agreed \u2014 I'll file a tech debt ticket after this incident.",
+        "effect": "tech_debt_commit",
+        "requiresTask": true
+      },
+      {
+        "text": "Root cause identified. Implementing fix now.",
+        "effect": "confidence",
+        "requiresTask": true
+      },
+      {
+        "text": "We need to discuss this post-incident. Not now.",
+        "effect": "defer"
+      }
     ],
     "vp_sales": [
-      { "text": "I'll update the status page with accurate information now.", "effect": "status_page_update" },
-      { "text": "Tell customers it's a planned maintenance window.", "effect": "lie" },
-      { "text": "I'll prepare an incident summary for customer-facing teams.", "effect": "report" }
+      {
+        "text": "I'll update the status page with accurate information now.",
+        "effect": "status_page_update",
+        "requiresTask": true
+      },
+      {
+        "text": "Tell customers it's a planned maintenance window.",
+        "effect": "lie"
+      },
+      {
+        "text": "I'll prepare an incident summary for customer-facing teams.",
+        "effect": "report",
+        "requiresTask": true
+      }
     ],
     "enterprise_customer": [
-      { "text": "We're aware and actively working on it. I'll send a detailed update shortly.", "effect": "acknowledge" },
-      { "text": "Apologies for the disruption. Crediting your account for downtime.", "effect": "credit" },
-      { "text": "This is within our SLA parameters. No action needed.", "effect": "deflect" }
+      {
+        "text": "We're aware and actively working on it. I'll send a detailed update shortly.",
+        "effect": "acknowledge",
+        "requiresTask": true
+      },
+      {
+        "text": "Apologies for the disruption. Crediting your account for downtime.",
+        "effect": "credit",
+        "requiresTask": true
+      },
+      {
+        "text": "This is within our SLA parameters. No action needed.",
+        "effect": "deflect"
+      }
     ],
     "junior_sre": [
-      { "text": "Good instinct! Check the upstream dependency first.", "effect": "mentor" },
-      { "text": "Escalate to me. I'll handle it.", "effect": "take_over" },
-      { "text": "Follow the runbook step by step. You've got this.", "effect": "encourage" }
+      {
+        "text": "Good instinct! Check the upstream dependency first.",
+        "effect": "mentor",
+        "requiresTask": true
+      },
+      {
+        "text": "Escalate to me. I'll handle it.",
+        "effect": "take_over"
+      },
+      {
+        "text": "Follow the runbook step by step. You've got this.",
+        "effect": "encourage",
+        "requiresTask": true
+      }
     ]
   },
   "effects": {
-    "promise_eta":         { "rep": 3,  "burnout": 5,  "debt": 0,  "cash": 0 },
-    "dismiss":             { "rep": -5, "burnout": -2, "debt": 0,  "cash": 0 },
-    "transparent":         { "rep": 5,  "burnout": 3,  "debt": 0,  "cash": 0 },
-    "tech_debt_commit":    { "rep": 2,  "burnout": 0,  "debt": -5, "cash": 0 },
-    "confidence":          { "rep": 4,  "burnout": 2,  "debt": 0,  "cash": 0 },
-    "defer":               { "rep": -2, "burnout": -3, "debt": 3,  "cash": 0 },
-    "status_page_update":  { "rep": 5,  "burnout": 2,  "debt": 0,  "cash": 0 },
-    "lie":                 { "rep": -10,"burnout": -2, "debt": 0,  "cash": 0 },
-    "report":              { "rep": 3,  "burnout": 5,  "debt": 0,  "cash": 0 },
-    "acknowledge":         { "rep": 4,  "burnout": 2,  "debt": 0,  "cash": 0 },
-    "credit":              { "rep": 6,  "burnout": 0,  "debt": 0,  "cash": -2000 },
-    "deflect":             { "rep": -8, "burnout": -2, "debt": 0,  "cash": 0 },
-    "mentor":              { "rep": 3,  "burnout": 5,  "debt": -2, "cash": 0 },
-    "take_over":           { "rep": 0,  "burnout": 8,  "debt": 0,  "cash": 0 },
-    "encourage":           { "rep": 2,  "burnout": -3, "debt": 0,  "cash": 0 }
+    "promise_eta": {
+      "rep": 3,
+      "burnout": 5,
+      "debt": 0,
+      "cash": 0
+    },
+    "dismiss": {
+      "rep": -5,
+      "burnout": -2,
+      "debt": 0,
+      "cash": 0
+    },
+    "transparent": {
+      "rep": 5,
+      "burnout": 3,
+      "debt": 0,
+      "cash": 0
+    },
+    "tech_debt_commit": {
+      "rep": 2,
+      "burnout": 0,
+      "debt": -5,
+      "cash": 0
+    },
+    "confidence": {
+      "rep": 4,
+      "burnout": 2,
+      "debt": 0,
+      "cash": 0
+    },
+    "defer": {
+      "rep": -2,
+      "burnout": -3,
+      "debt": 3,
+      "cash": 0
+    },
+    "status_page_update": {
+      "rep": 5,
+      "burnout": 2,
+      "debt": 0,
+      "cash": 0
+    },
+    "lie": {
+      "rep": -10,
+      "burnout": -2,
+      "debt": 0,
+      "cash": 0
+    },
+    "report": {
+      "rep": 3,
+      "burnout": 5,
+      "debt": 0,
+      "cash": 0
+    },
+    "acknowledge": {
+      "rep": 4,
+      "burnout": 2,
+      "debt": 0,
+      "cash": 0
+    },
+    "credit": {
+      "rep": 6,
+      "burnout": 0,
+      "debt": 0,
+      "cash": -2000
+    },
+    "deflect": {
+      "rep": -8,
+      "burnout": -2,
+      "debt": 0,
+      "cash": 0
+    },
+    "mentor": {
+      "rep": 3,
+      "burnout": 5,
+      "debt": -2,
+      "cash": 0
+    },
+    "take_over": {
+      "rep": 0,
+      "burnout": 8,
+      "debt": 0,
+      "cash": 0
+    },
+    "encourage": {
+      "rep": 2,
+      "burnout": -3,
+      "debt": 0,
+      "cash": 0
+    }
+  },
+  "stakeholderTasks": {
+    "ceo_promise_eta": {
+      "type": "terminal",
+      "data": {
+        "prompt": "CEO needs an ETA. Check current incident status and error rates before responding.",
+        "command": "kubectl get pods --all-namespaces | grep -v Running | wc -",
+        "placeholder": "flag",
+        "expectedCompletion": "l"
+      }
+    },
+    "ceo_transparent": {
+      "type": "button-sequence",
+      "data": {
+        "title": "Prepare CEO Status Update",
+        "description": "CEO wants transparency. Complete these steps before responding.",
+        "steps": [
+          {
+            "label": "Check error rate",
+            "buttonText": "curl -s https://api.uptime9999.io/metrics | grep error_rate",
+            "correct": true
+          },
+          {
+            "label": "Identify root cause",
+            "buttonText": "kubectl logs deployment/app --tail=50 | grep ERROR | head -10",
+            "correct": true
+          },
+          {
+            "label": "Draft status update",
+            "buttonText": "post update to status.uptime9999.io with incident details",
+            "correct": true
+          },
+          {
+            "label": "Blame the team",
+            "buttonText": "forward CEO email to engineering team",
+            "correct": false
+          }
+        ]
+      }
+    },
+    "cto_tech_debt_commit": {
+      "type": "multi-choice",
+      "data": {
+        "question": "CTO wants a tech debt commitment. Which action actually reduces tech debt sustainably?",
+        "options": [
+          {
+            "id": "a",
+            "text": "Schedule a reliability sprint: allocate 20% of next sprint to tech debt paydown with measurable outcomes",
+            "correct": true
+          },
+          {
+            "id": "b",
+            "text": "Add tech debt items to backlog and mark them 'low priority' for later",
+            "correct": false
+          },
+          {
+            "id": "c",
+            "text": "Rewrite everything from scratch in a new language",
+            "correct": false
+          }
+        ]
+      }
+    },
+    "cto_confidence": {
+      "type": "log",
+      "data": {
+        "logs": [
+          "[INFO]  2024-01-15 09:14:01 app: Health check passed",
+          "[WARN]  2024-01-15 09:14:03 db: Connection pool at 87%",
+          "[ERROR] 2024-01-15 09:14:05 app: root cause identified \u2014 upstream API timeout after 30s causing cascade retry storm",
+          "[WARN]  2024-01-15 09:14:07 cache: Hit rate dropped to 61%",
+          "[INFO]  2024-01-15 09:14:09 lb: Rerouting traffic to healthy instances",
+          "[INFO]  2024-01-15 09:14:11 app: Retry backoff applied \u2014 reducing thundering herd",
+          "[INFO]  2024-01-15 09:14:13 db: Connections normalizing: 74%",
+          "[INFO]  2024-01-15 09:14:15 app: Error rate declining: 8% \u2192 3%",
+          "[INFO]  2024-01-15 09:14:17 app: Request latency normalizing: 420ms \u2192 180ms"
+        ],
+        "targetError": "cascade retry storm"
+      }
+    },
+    "vp_sales_status_page_update": {
+      "type": "config",
+      "data": {
+        "filename": "status_page.yml",
+        "key": "status",
+        "cur": "operational",
+        "target": "partial_outage",
+        "content": "# Status Page Configuration\nsite_name: Uptime 9999\nstatus: operational\nmessage: All systems normal\nlast_updated: auto\nnotify_subscribers: false\nincident_url: null"
+      }
+    },
+    "vp_sales_report": {
+      "type": "button-sequence",
+      "data": {
+        "title": "Prepare Customer-Facing Incident Report",
+        "description": "VP Sales needs a report for enterprise customers. Prepare it correctly.",
+        "steps": [
+          {
+            "label": "Document timeline",
+            "buttonText": "write: incident started HH:MM, identified HH:MM, resolved ETA HH:MM",
+            "correct": true
+          },
+          {
+            "label": "Describe impact",
+            "buttonText": "write: X% of API requests affected, Y services degraded",
+            "correct": true
+          },
+          {
+            "label": "State next steps",
+            "buttonText": "write: post-mortem scheduled, preventive measures being implemented",
+            "correct": true
+          },
+          {
+            "label": "Minimize incident",
+            "buttonText": "write: minor blip, no real impact, ignore it",
+            "correct": false
+          }
+        ]
+      }
+    },
+    "enterprise_customer_acknowledge": {
+      "type": "terminal",
+      "data": {
+        "prompt": "Customer needs acknowledgment. Send them a status page update first.",
+        "command": "curl -X POST https://status.uptime9999.io/api/incidents -d '{\"status\":\"investigating\",\"impact\":\"",
+        "placeholder": "partial\"}'",
+        "expectedCompletion": "partial\"}'"
+      }
+    },
+    "enterprise_customer_credit": {
+      "type": "multi-choice",
+      "data": {
+        "question": "Enterprise customer wants credit for downtime. Your SLA guarantees 99.9% monthly uptime. You're at 99.7%. What is the correct response?",
+        "options": [
+          {
+            "id": "a",
+            "text": "Issue a prorated service credit per the SLA agreement and document it in the customer account",
+            "correct": true
+          },
+          {
+            "id": "b",
+            "text": "Offer a free month of service to avoid the credit conversation",
+            "correct": false
+          },
+          {
+            "id": "c",
+            "text": "Point out you're only 0.2% below SLA so technically no credit is owed",
+            "correct": false
+          }
+        ]
+      }
+    },
+    "junior_sre_mentor": {
+      "type": "button-sequence",
+      "data": {
+        "title": "Guide Junior SRE Through Investigation",
+        "description": "Mentor your Junior SRE with the correct investigation steps.",
+        "steps": [
+          {
+            "label": "Check recent changes",
+            "buttonText": "git log --oneline --since='1 hour ago' -- k8s/ terraform/ config/",
+            "correct": true
+          },
+          {
+            "label": "Review alert context",
+            "buttonText": "kubectl describe pod $(kubectl get pod -l app=uptime9999 -o name | head -1) | grep -A5 Events:",
+            "correct": true
+          },
+          {
+            "label": "Identify blast radius",
+            "buttonText": "kubectl get pods --all-namespaces | grep -v Running | awk '{print $1}' | sort -u",
+            "correct": true
+          },
+          {
+            "label": "Just restart everything",
+            "buttonText": "kubectl rollout restart deployment --all",
+            "correct": false
+          }
+        ]
+      }
+    },
+    "junior_sre_encourage": {
+      "type": "multi-choice",
+      "data": {
+        "question": "Junior SRE is unsure whether to escalate. How do you guide them?",
+        "options": [
+          {
+            "id": "a",
+            "text": "Define clear escalation criteria: P1 = customer impact, P2 = degraded service, P3 = no impact. Then let them decide with that framework.",
+            "correct": true
+          },
+          {
+            "id": "b",
+            "text": "Tell them to always escalate everything immediately to be safe",
+            "correct": false
+          },
+          {
+            "id": "c",
+            "text": "Handle it yourself so they don't make it worse",
+            "correct": false
+          }
+        ]
+      }
+    }
   }
 }

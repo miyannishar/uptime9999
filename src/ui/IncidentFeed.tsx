@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { ActiveIncident, GameState } from '../sim/types';
 import { INCIDENTS } from '../data/incidents';
 import LogsModal from './LogsModal';
+import TaskModal from './TaskModal';
 import { SevDot, AiBadge, StatusBadge } from './atoms';
+import rawStakeholders from '../data/json/stakeholders.json';
+import type { TaskData } from '../services/taskGenerator';
+
+type StakeholderTaskMap = Record<string, TaskData>;
+const STAKEHOLDER_TASKS = rawStakeholders.stakeholderTasks as unknown as StakeholderTaskMap;
 
 interface IncidentFeedProps {
   incidents: ActiveIncident[];
@@ -18,6 +24,10 @@ export default function IncidentFeed({
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [selectedLogsIncident, setSelectedLogsIncident] = useState<any>(null);
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+  const [pendingTask, setPendingTask] = useState<{
+    messageId: string; responseIndex: number; taskData: TaskData;
+    personaId: string; responseText: string;
+  } | null>(null);
 
   const handleViewLogs = (incident: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,18 +93,29 @@ export default function IncidentFeed({
               </div>
               {isExpanded && (
                 <div className="stakeholder-responses" onClick={e => e.stopPropagation()}>
-                  {msg.responses.map((r, i) => (
-                    <button
-                      key={i}
-                      className="stakeholder-response-btn"
-                      onClick={() => {
-                        onRespondStakeholder(msg.id, i);
-                        setExpandedMessageId(null);
-                      }}
-                    >
-                      {r.text}
-                    </button>
-                  ))}
+                  {msg.responses.map((r, i) => {
+                    const resp = r as { text: string; effect: string; requiresTask?: boolean };
+                    const taskKey = `${msg.character.toLowerCase().replace(/\s+/g,'_')}_${resp.effect}`;
+                    const task = resp.requiresTask ? STAKEHOLDER_TASKS[taskKey] : undefined;
+                    return (
+                      <button
+                        key={i}
+                        className={`stakeholder-response-btn ${task ? 'needs-task' : ''}`}
+                        onClick={() => {
+                          if (task) {
+                            setPendingTask({ messageId: msg.id, responseIndex: i, taskData: task,
+                              personaId: msg.character, responseText: resp.text });
+                            setExpandedMessageId(null);
+                          } else {
+                            onRespondStakeholder(msg.id, i);
+                            setExpandedMessageId(null);
+                          }
+                        }}
+                      >
+                        {task ? '🎯 ' : ''}{resp.text}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -145,6 +166,23 @@ export default function IncidentFeed({
           incidentName={(selectedLogsIncident as any).aiIncidentName || 'Incident'}
           logs={(selectedLogsIncident as any).aiLogs || 'No logs available'}
           onClose={() => setLogsModalOpen(false)}
+        />
+      )}
+
+      {/* Stakeholder task modal — must complete task before response is sent */}
+      {pendingTask && (
+        <TaskModal
+          incidentName={`${pendingTask.personaId} wants action`}
+          incidentDescription="Complete this task to respond"
+          actionName={pendingTask.responseText}
+          actionDescription="Stakeholder response requires real work"
+          targetNode="global"
+          initialTaskData={pendingTask.taskData}
+          onComplete={() => {
+            onRespondStakeholder(pendingTask.messageId, pendingTask.responseIndex);
+            setPendingTask(null);
+          }}
+          onClose={() => setPendingTask(null)}
         />
       )}
     </div>

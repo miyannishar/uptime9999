@@ -913,3 +913,22 @@
   border-color: #3b82f6;
   color: #bfdbfe;
 }
+
+/* Task-required response button */
+.stakeholder-response-btn.needs-task {
+  border-color: #f59e0b !important;
+  color: #fcd34d !important;
+  background: #1a1205 !important;
+  position: relative;
+}
+.stakeholder-response-btn.needs-task:hover {
+  background: #2d1f05 !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 6px #f59e0b40;
+}
+.stakeholder-response-btn.needs-task::after {
+  content: ' ← task required';
+  font-size: 0.65rem;
+  color: #f59e0b;
+  opacity: 0.7;
+}
