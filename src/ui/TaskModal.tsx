@@ -126,10 +126,8 @@ export default function TaskModal({
 
   const handleTaskComplete = () => {
     setTaskCompleted(true);
-    // Wait a moment to show success, then trigger the actual action
-    setTimeout(() => {
-      onComplete();
-    }, 1000);
+    // Local tasks: quick flash then fire. AI tasks: brief celebration.
+    setTimeout(() => onComplete(), initialTaskData ? 250 : 800);
   };
 
   return (

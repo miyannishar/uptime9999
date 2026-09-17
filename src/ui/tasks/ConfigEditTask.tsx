@@ -86,9 +86,9 @@ export default function ConfigEditTask({
         <button 
           className="task-skip-btn" 
           onClick={onComplete}
-          disabled={secondsElapsed < 10}
+          disabled={secondsElapsed < 5}
         >
-          ⏭️ Skip {secondsElapsed < 10 ? `(${10 - secondsElapsed}s)` : '(Auto-fix)'}
+          ⏭️ Skip {secondsElapsed < 5 ? `(${5 - secondsElapsed}s)` : '(Auto-fix)'}
         </button>
       </div>
     </div>
