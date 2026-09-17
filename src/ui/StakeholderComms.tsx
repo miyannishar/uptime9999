@@ -8,7 +8,7 @@ interface StakeholderCommsProps {
 
 export default function StakeholderComms({ state, onRespond, onDismiss }: StakeholderCommsProps) {
   const activeMessages = state.stakeholderMessages.filter(
-    m => !m.selectedResponse && m.expiresAt > Date.now()
+    m => m.selectedResponse === undefined && m.expiresAt > Date.now()
   );
 
   if (activeMessages.length === 0) return null;

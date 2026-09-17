@@ -625,21 +625,6 @@ export const ACTIONS: ActionDefinition[] = [
     },
   },
   {
-    id: 'increase_price',
-    name: 'Increase Price',
-    description: 'Raise pricing (revenue +, churn +)',
-    category: 'Business',
-    target: 'global',
-    oneTimeCost: 0,
-    recurringCostDelta: 0,
-    durationSeconds: 0,
-    successChance: 1.0,
-    cooldownSeconds: 600,
-    effects: {
-      reputationDelta: -5,
-    },
-  },
-  {
     id: 'marketing_campaign',
     name: 'Marketing Campaign',
     description: 'Boost growth and reputation (traffic spike risk)',

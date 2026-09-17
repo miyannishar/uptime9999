@@ -1,5 +1,6 @@
 import { GameState } from '../sim/types';
 import { ACTIONS } from '../data/actions';
+import { isActionTargetPresent } from '../sim/actionAvailability';
 
 interface ActionBarProps {
   state: GameState;
@@ -94,7 +95,7 @@ export default function ActionBar({ state, onExecuteAction }: ActionBarProps) {
           if (!action) return null;
 
           // Hide actions for components not yet deployed
-          if (action.target && !state.deployedComponents.has(action.target)) return null;
+          if (!isActionTargetPresent(state, action.target)) return null;
 
           const canExecute = canExecuteAction(actionId);
           const cooldown = getCooldownRemaining(actionId);

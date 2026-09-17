@@ -21,6 +21,8 @@ export function cloneGameState(state: GameState): GameState {
     ])
   );
 
+  // Primitive fields (numbers, strings, booleans) — including recurringCostAdjustment —
+  // are correctly shallow-copied by the spread below. No explicit entry is needed.
   return {
     ...state,
     architecture: clonedArchitecture,
@@ -33,6 +35,7 @@ export function cloneGameState(state: GameState): GameState {
     uptimeWindow: [...state.uptimeWindow],
     // Enhancement features
     achievements: new Set(state.achievements),
+    tokenUsage: { ...state.tokenUsage },
     stakeholderMessages: state.stakeholderMessages.map(m => ({ ...m, responses: [...m.responses] })),
     postMortemQueue: state.postMortemQueue.map(p => ({ ...p })),
     statusPageHistory: [...state.statusPageHistory],

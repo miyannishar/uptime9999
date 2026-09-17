@@ -13,15 +13,18 @@ import {
   computeReputationDelta,
   computeAlertFatigueGrowth,
 } from './formulas';
+import { METRIC_BASELINES } from './componentMetrics';
 import { INCIDENTS } from '../data/incidents';
-import { createMinimalArchitecture } from '../data/architecture';
-import { STARTING_COMPONENTS } from '../config/progressionConfig';
+import { ACTIONS } from '../data/actions';
+import { createMinimalArchitecture, deployComponent } from '../data/architecture';
+import { STARTING_COMPONENTS, COMPONENT_BLUEPRINTS } from '../config/progressionConfig';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { clampMetric, clampAllMetrics } from './clampMetrics';
 import { cloneGameState } from '../utils/stateUtils';
 import { tlog } from '../utils/terminalLog';
 import { soundNotifications } from '../utils/soundNotifications';
 import { applyRelatedMitigation } from './reducer';
+import { spawnFromTemplates } from './incidentSpawner';
 
 export function createInitialState(seed: string): GameState {
   const architecture = createMinimalArchitecture();
@@ -59,13 +62,14 @@ export function createInitialState(seed: string): GameState {
     cash: GAME_CONFIG.starting.cash,
     revenue: 0,
     costs: 0,
+    recurringCostAdjustment: 0,
     pricing: GAME_CONFIG.starting.pricing,
     reputation: GAME_CONFIG.starting.reputation,
 
     globalErrorRate: 0,
     globalLatencyP95: 0,
     uptime: 1.0,
-    uptimeWindow: Array(GAME_CONFIG.simulation.uptimeWindowSize).fill(1),
+    uptimeWindow: Array(Math.round(GAME_CONFIG.simulation.uptimeWindowSeconds / GAME_CONFIG.simulation.tickSeconds)).fill(1),
     uptimeStreak: 0,
     longestStreak: 0,
 
@@ -95,6 +99,7 @@ export function createInitialState(seed: string): GameState {
     gameOver: false,
 
     reputationZeroTimer: 0,
+    elapsedSim: 0,
 
     totalProfit: 0,
     totalIncidents: 0,
@@ -127,26 +132,8 @@ export function createInitialState(seed: string): GameState {
 }
 
 // Default metric baselines for recovery (derived from architecture.ts initial values)
-const DEFAULT_METRIC_BASELINES: Record<string, Record<string, number>> = {
-  DNS: { cacheHitRate: 0.85, ttl: 300, propagationDelay: 5 },
-  CDN: { cacheHitRate: 0.75, bandwidthGbps: 10, cacheSizeGB: 500, ttl: 300 },
-  WAF: { blockedRequestsPercent: 0.01, inspectionLatency: 5, falsePositiveRate: 0.001 },
-  GLB: { healthCheckInterval: 5, failedHealthChecks: 0 },
-  RLB: { healthCheckInterval: 3, failedHealthChecks: 0 },
-  APIGW: { rateLimitHitRate: 0.01, transformationLatency: 5 },
-  APP: { avgCPUPercent: 30, avgMemoryPercent: 40 },
-  CACHE: { hitRate: 0.80, evictionRate: 10, memoryFragmentation: 0.15, avgTTL: 300 },
-  QUEUE: { messagesQueued: 0, avgMessageAge: 2, deadLetterQueueSize: 0 },
-  WORKERS: { failedJobsPercent: 0.01, queueBacklog: 0, avgJobDuration: 10 },
-  DB_PRIMARY: { slowQueriesPercent: 0.05, replicationLag: 0, cacheHitRate: 0.70, indexEfficiency: 0.85 },
-  DB_REPLICA: { slowQueriesPercent: 0.05, replicationLag: 100, cacheHitRate: 0.70, indexEfficiency: 0.85 },
-  OBJECT_STORAGE: { coldStoragePercent: 0.2 },
-  OBSERVABILITY: { queryLatency: 100 },
-  SERVICE_MESH: { circuitBreakersOpen: 0, retryRate: 0, sidecarOverhead: 3 },
-};
-
 function getDefaultMetricValue(nodeType: string, metricKey: string): number | null {
-  const baselines = DEFAULT_METRIC_BASELINES[nodeType];
+  const baselines = METRIC_BASELINES[nodeType];
   if (baselines && metricKey in baselines) {
     return baselines[metricKey];
   }
@@ -169,11 +156,12 @@ function buildRedundancyGroupMap(nodes: Map<string, ComponentNode>): Map<string,
   return groups;
 }
 
-export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1): GameState {
+export function tickSimulation(state: GameState, rng: SeededRNG, dt: number = 1): GameState {
   if (state.paused || state.gameOver) return state;
 
   // O1: Use centralized deep-clone utility instead of inline copy-paste
   const newState = cloneGameState(state);
+  newState.elapsedSim += dt;
 
   const elapsed = (Date.now() - state.startTime) / 1000;
 
@@ -184,7 +172,7 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
 
   // === 1. TRAFFIC GENERATION ===
   const activityRate = getActivityRate(newState.hourOfDay, newState.dayOfWeek);
-  const baseRPS = newState.users * activityRate * 0.01; // 1% of users active
+  const baseRPS = newState.users * activityRate * GAME_CONFIG.traffic.rpsPerActiveUser;
   newState.rps = Math.max(0, baseRPS);
 
   // === 2. PROPAGATE LOAD THROUGH ARCHITECTURE ===
@@ -203,7 +191,7 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
   updateBusiness(newState, dt);
 
   // === 7. INCIDENTS ===
-  // All incidents are now AI-generated based on system metrics
+  spawnFromTemplates(newState, rng, dt);
   
   // === 8. CLEANUP OLD INCIDENT TARGETS ===
   // Remove targets older than 60 seconds to allow re-targeting
@@ -219,10 +207,13 @@ export function tickSimulation(state: GameState, _rng: SeededRNG, dt: number = 1
   updateActions(newState, dt);
 
   // === 11. CHECK GAME OVER ===
-  checkGameOver(newState);
+  checkGameOver(newState, dt);
 
   // === 12. UPDATE STRESS ===
   updateStress(newState, dt);
+
+  // === 13. COMPLETE DEPLOYMENTS ===
+  completeDeployments(newState);
 
   return newState;
 }
@@ -303,7 +294,9 @@ function propagateLoad(state: GameState, ingressRPS: number) {
         // O2: Use pre-built redundancy group map
         if (target.redundancyGroup) {
           const allGroupInstances = redundancyGroups.get(target.redundancyGroup) || [];
-          const healthyInstances = allGroupInstances.filter(n => n.enabled && n.health > 0.3);
+          const healthyInstances = allGroupInstances.filter(
+            n => n.enabled && n.health > 0.3 && n.scaling.current > 0
+          );
           
           if (healthyInstances.length > 0) {
             const loadPerInstance = propagatedLoad / healthyInstances.length;
@@ -336,14 +329,27 @@ function propagateLoad(state: GameState, ingressRPS: number) {
   }
 }
 
+type EffectMaps = {
+  healthDecay: Map<string, number>;
+  errorMult: Map<string, number>;
+  latencyMult: Map<string, number>;
+  utilMult: Map<string, number>;
+};
+
+function emptyEffectMaps(): EffectMaps {
+  return { healthDecay: new Map(), errorMult: new Map(), latencyMult: new Map(), utilMult: new Map() };
+}
+
+function mitigationFactor(incident: import('./types').ActiveIncident, mitigatedIds: Set<string>): number {
+  const immediate = mitigatedIds.has(incident.id) ? GAME_CONFIG.incidents.immediateMitigationOnActionStart : 0;
+  return 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediate);
+}
+
+
+
 function applyIncidentEffects(state: GameState, dt: number) {
   const { nodes } = state.architecture;
-
-  // Track cumulative effects per node to prevent stacking
-  const nodeHealthDecay = new Map<string, number>();
-  const nodeErrorMult = new Map<string, number>();
-  const nodeLatencyMult = new Map<string, number>();
-  const nodeUtilMult = new Map<string, number>();
+  const maps = emptyEffectMaps();
 
   // O2: Pre-build set of incident IDs currently being mitigated for O(1) lookups
   const mitigatedIncidentIds = new Set<string>(
@@ -353,7 +359,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
   );
 
   // First pass: collect all effects
-  for (const incident of state.activeIncidents) {
+  for (const incident of [...state.activeIncidents]) {
     // Handle AI-generated incidents
     if (incident.aiGenerated) {
       const targetNode = nodes.get(incident.targetNodeId);
@@ -364,14 +370,7 @@ function applyIncidentEffects(state: GameState, dt: number) {
         continue;
       }
 
-      // O2: Use pre-built set instead of scanning actionsInProgress
-      const hasMitigatingAction = mitigatedIncidentIds.has(incident.id);
-      
-      // Apply immediate mitigation if action is in progress
-      const immediateMitigation = hasMitigatingAction 
-        ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
-        : 0;
-      const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
+      const mf = mitigationFactor(incident, mitigatedIncidentIds);
 
       // O5: aiEffects is already typed on ActiveIncident — no cast needed
       const aiEffects = incident.aiEffects;
@@ -379,24 +378,24 @@ function applyIncidentEffects(state: GameState, dt: number) {
       // Apply AI-specified effects if available
       if (aiEffects) {
         if (aiEffects.errorMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.errorMultiplier - 1) * mitigationFactor;
-          const current = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.errorMultiplier - 1) * mf;
+          const current = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.latencyMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.latencyMultiplier - 1) * mitigationFactor;
-          const current = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.latencyMultiplier - 1) * mf;
+          const current = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.utilizationMultiplier) {
-          const effectiveMultiplier = 1 + (aiEffects.utilizationMultiplier - 1) * mitigationFactor;
-          const current = nodeUtilMult.get(incident.targetNodeId) || 1;
-          nodeUtilMult.set(incident.targetNodeId, current * effectiveMultiplier);
+          const effectiveMultiplier = 1 + (aiEffects.utilizationMultiplier - 1) * mf;
+          const current = maps.utilMult.get(incident.targetNodeId) || 1;
+          maps.utilMult.set(incident.targetNodeId, current * effectiveMultiplier);
         }
         if (aiEffects.healthDecayPerSec) {
-          const decay = aiEffects.healthDecayPerSec * mitigationFactor;
-          const current = nodeHealthDecay.get(incident.targetNodeId) || 0;
-          nodeHealthDecay.set(incident.targetNodeId, current + decay);
+          const decay = aiEffects.healthDecayPerSec * mf;
+          const current = maps.healthDecay.get(incident.targetNodeId) || 0;
+          maps.healthDecay.set(incident.targetNodeId, current + decay);
         }
         
         // Apply component-specific metric effects
@@ -406,24 +405,26 @@ function applyIncidentEffects(state: GameState, dt: number) {
           for (const [metricKey, effectValue] of Object.entries(aiEffects.metricEffects)) {
             if (metricKey in targetNode.specificMetrics) {
               const currentValue = targetNode.specificMetrics[metricKey];
-              if (typeof currentValue === 'number' && typeof effectValue === 'number') {
+              const delta = Number(effectValue);
+              if (!Number.isFinite(delta)) continue;
+              if (typeof currentValue === 'number' && typeof delta === 'number') {
                 // Clamp effect value to reasonable bounds first
-                let clampedEffect = effectValue;
+                let clampedEffect = delta;
                 if (metricKey.includes('Percent') || metricKey === 'avgCPUPercent' || metricKey === 'avgMemoryPercent') {
-                  clampedEffect = Math.max(-50, Math.min(50, effectValue)); // Max ±50% change
+                  clampedEffect = Math.max(-50, Math.min(50, delta)); // Max ±50% change
                 } else if (metricKey === 'connections' || metricKey === 'concurrentConnections') {
-                  clampedEffect = Math.max(-100, Math.min(100, effectValue)); // Max ±100 connections
+                  clampedEffect = Math.max(-100, Math.min(100, delta)); // Max ±100 connections
                 } else if (metricKey === 'evictionRate') {
-                  clampedEffect = Math.max(-500, Math.min(500, effectValue)); // Max ±500 keys/sec
+                  clampedEffect = Math.max(-500, Math.min(500, delta)); // Max ±500 keys/sec
                 } else if (metricKey === 'queueBacklog' || metricKey === 'messagesQueued') {
-                  clampedEffect = Math.max(-5000, Math.min(5000, effectValue)); // Max ±5k messages
+                  clampedEffect = Math.max(-5000, Math.min(5000, delta)); // Max ±5k messages
                 } else if (metricKey === 'hitRate' || metricKey.includes('Rate')) {
-                  clampedEffect = Math.max(-0.5, Math.min(0.5, effectValue)); // Max ±0.5 (50%)
+                  clampedEffect = Math.max(-0.5, Math.min(0.5, delta)); // Max ±0.5 (50%)
                 }
                 
                 // Apply gradually over time (effectValue represents target change over ~10 seconds)
                 // So we apply 10% of the effect per second
-                const effectiveChange = (clampedEffect * 0.1) * mitigationFactor * dt;
+                const effectiveChange = (clampedEffect * 0.1) * mf * dt;
                 const newValue = currentValue + effectiveChange;
                 targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
               }
@@ -433,20 +434,20 @@ function applyIncidentEffects(state: GameState, dt: number) {
       } else {
         // Fallback: Apply effects based on severity
         if (incident.severity === 'CRIT') {
-          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 3.0 * mitigationFactor));
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 2.5 * mitigationFactor));
-          const currentDecay = nodeHealthDecay.get(incident.targetNodeId) || 0;
-          nodeHealthDecay.set(incident.targetNodeId, currentDecay + 0.02 * mitigationFactor);
+          const currentErr = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, currentErr * (1 + 3.0 * mf));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 2.5 * mf));
+          const currentDecay = maps.healthDecay.get(incident.targetNodeId) || 0;
+          maps.healthDecay.set(incident.targetNodeId, currentDecay + 0.02 * mf);
         } else if (incident.severity === 'WARN') {
-          const currentErr = nodeErrorMult.get(incident.targetNodeId) || 1;
-          nodeErrorMult.set(incident.targetNodeId, currentErr * (1 + 1.5 * mitigationFactor));
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.3 * mitigationFactor));
+          const currentErr = maps.errorMult.get(incident.targetNodeId) || 1;
+          maps.errorMult.set(incident.targetNodeId, currentErr * (1 + 1.5 * mf));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 1.3 * mf));
         } else if (incident.severity === 'INFO') {
-          const currentLat = nodeLatencyMult.get(incident.targetNodeId) || 1;
-          nodeLatencyMult.set(incident.targetNodeId, currentLat * (1 + 1.1 * mitigationFactor));
+          const currentLat = maps.latencyMult.get(incident.targetNodeId) || 1;
+          maps.latencyMult.set(incident.targetNodeId, currentLat * (1 + 1.1 * mf));
         }
       }
       
@@ -460,37 +461,30 @@ function applyIncidentEffects(state: GameState, dt: number) {
     const targetNode = nodes.get(targetNodeId);
     if (!targetNode) continue;
 
-    // O2: Use pre-built set instead of scanning actionsInProgress
-    const hasMitigatingAction = mitigatedIncidentIds.has(incident.id);
-    
-    // Apply immediate mitigation if action is in progress
-    const immediateMitigation = hasMitigatingAction 
-      ? GAME_CONFIG.incidents.immediateMitigationOnActionStart 
-      : 0;
-    const mitigationFactor = 1 - Math.min(1.0, incident.mitigationLevel * 0.7 + immediateMitigation);
+    const mf = mitigationFactor(incident, mitigatedIncidentIds);
 
     const effects = incidentDef.effects;
 
     // Collect effects (to be applied in second pass with caps)
     if (effects.utilizationMultiplier) {
-      const effectiveMultiplier = 1 + (effects.utilizationMultiplier - 1) * mitigationFactor;
-      const current = nodeUtilMult.get(targetNodeId) || 1;
-      nodeUtilMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.utilizationMultiplier - 1) * mf;
+      const current = maps.utilMult.get(targetNodeId) || 1;
+      maps.utilMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.latencyMultiplier) {
-      const effectiveMultiplier = 1 + (effects.latencyMultiplier - 1) * mitigationFactor;
-      const current = nodeLatencyMult.get(targetNodeId) || 1;
-      nodeLatencyMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.latencyMultiplier - 1) * mf;
+      const current = maps.latencyMult.get(targetNodeId) || 1;
+      maps.latencyMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.errorMultiplier) {
-      const effectiveMultiplier = 1 + (effects.errorMultiplier - 1) * mitigationFactor;
-      const current = nodeErrorMult.get(targetNodeId) || 1;
-      nodeErrorMult.set(targetNodeId, current * effectiveMultiplier);
+      const effectiveMultiplier = 1 + (effects.errorMultiplier - 1) * mf;
+      const current = maps.errorMult.get(targetNodeId) || 1;
+      maps.errorMult.set(targetNodeId, current * effectiveMultiplier);
     }
     if (effects.healthDecayPerSec) {
-      const decay = effects.healthDecayPerSec * mitigationFactor;
-      const current = nodeHealthDecay.get(targetNodeId) || 0;
-      nodeHealthDecay.set(targetNodeId, current + decay);
+      const decay = effects.healthDecayPerSec * mf;
+      const current = maps.healthDecay.get(targetNodeId) || 0;
+      maps.healthDecay.set(targetNodeId, current + decay);
     }
     if (effects.capacityMultiplier) {
       // Store original capacity for restoration (only once)
@@ -508,16 +502,46 @@ function applyIncidentEffects(state: GameState, dt: number) {
         const escalatedDef = INCIDENTS.find(i => i.id === incidentDef.escalatesTo);
         if (escalatedDef) {
           state.activeIncidents.push({
-            id: `incident_${Date.now()}_${Math.random()}`,
+            id: `esc_${incidentDef.escalatesTo}_${state.elapsedSim.toFixed(1)}`,
             definitionId: escalatedDef.id,
             targetNodeId: incident.targetNodeId,
             severity: escalatedDef.severity,
             startTime: Date.now(),
+            startSim: state.elapsedSim,
             escalationTimer: escalatedDef.escalationTimeSeconds || 0,
             outagetimer: escalatedDef.timeToOutageSeconds || 0,
             mitigationLevel: 0,
             mitigationProgress: 0,
           });
+        }
+      }
+    }
+
+    // Spread: a long-running unmitigated incident can pull in a neighbouring type
+    if (incidentDef.spreadsTo?.length && incident.mitigationLevel < 0.5) {
+      const age = state.elapsedSim - incident.startSim;
+      if (age > GAME_CONFIG.incidents.spreadAfterSeconds) {
+        const already = new Set(state.activeIncidents.map(i => i.targetNodeId));
+        const victim = Array.from(state.architecture.nodes.values()).find(
+          n => n.enabled && incidentDef.spreadsTo!.includes(n.type) && !already.has(n.id)
+        );
+        if (victim && state.activeIncidents.length < GAME_CONFIG.incidents.maxConcurrent) {
+          state.activeIncidents.push({
+            id: `spread_${incident.id}_${victim.id}`,
+            definitionId: incident.definitionId,
+            targetNodeId: victim.id,
+            severity: incident.severity,
+            startTime: Date.now(),
+            startSim: state.elapsedSim,
+            escalationTimer: 0,
+            outagetimer: incidentDef.timeToOutageSeconds ?? 0,
+            mitigationLevel: 0,
+            mitigationProgress: 0,
+            relatedIncidentIds: [incident.id],
+            rootCauseShared: true,
+          });
+          state.totalIncidents++;
+          tlog.warn(`⚠️ ${incidentDef.name} spread to ${victim.name}`);
         }
       }
     }
@@ -532,43 +556,40 @@ function applyIncidentEffects(state: GameState, dt: number) {
     }
   }
 
-  // Second pass: Apply collected effects with caps to prevent death spiral
+  // Second pass: apply accumulated effects with caps
+  applyAccumulatedEffects(state, maps, dt);
+}
+
+function applyAccumulatedEffects(state: GameState, maps: EffectMaps, dt: number) {
+  const { nodes } = state.architecture;
   const caps = GAME_CONFIG.incidents.aiEffectCaps;
-  
   nodes.forEach((node, nodeId) => {
     // Apply error multiplier (capped)
-    const errorMult = nodeErrorMult.get(nodeId);
+    const errorMult = maps.errorMult.get(nodeId);
     if (errorMult) {
       const cappedMult = Math.min(errorMult, caps.maxErrorMultiplier);
       node.errorRate *= cappedMult;
     }
 
     // Apply latency multiplier (capped)
-    const latencyMult = nodeLatencyMult.get(nodeId);
+    const latencyMult = maps.latencyMult.get(nodeId);
     if (latencyMult) {
       const cappedMult = Math.min(latencyMult, caps.maxLatencyMultiplier);
       node.latency *= cappedMult;
     }
 
     // Apply utilization multiplier (capped)
-    const utilMult = nodeUtilMult.get(nodeId);
+    const utilMult = maps.utilMult.get(nodeId);
     if (utilMult) {
       const cappedMult = Math.min(utilMult, caps.maxUtilizationMultiplier);
       node.utilization *= cappedMult;
     }
 
     // Apply health decay (capped per second, not per incident)
-    const healthDecay = nodeHealthDecay.get(nodeId);
+    const healthDecay = maps.healthDecay.get(nodeId);
     if (healthDecay) {
       const cappedDecay = Math.min(healthDecay, caps.maxHealthDecayPerSec);
       node.health = Math.max(0, node.health - cappedDecay * dt);
-      
-      // M3 FIX: Allow partial health recovery even during incidents
-      // Recover at 30% of normal rate so nodes don't stay permanently damaged
-      if (node.health < 1.0) {
-        const partialRecovery = 0.05 * GAME_CONFIG.metricRecovery.healthRecoveryDuringIncident * (1 - Math.min(0.7, node.utilization));
-        node.health = Math.min(1.0, node.health + partialRecovery * dt);
-      }
     } else if (node.health < 1.0) {
       // Natural health recovery when no incidents are affecting this node
       // Recover 5% health per second (slower if under load)
@@ -727,7 +748,8 @@ function updateBusiness(state: GameState, dt: number) {
     }
   });
 
-  state.costs = infrastructureCost;
+  // recurringCostAdjustment is a primitive, so the spread in cloneGameState already copies it.
+  state.costs = Math.max(0, infrastructureCost + state.recurringCostAdjustment);
 
   // Compute base revenue
   let revenue = computeRevenue(state.users, state.pricing, state.reputation, state.uptime);
@@ -835,20 +857,21 @@ function updateBusiness(state: GameState, dt: number) {
 // All incidents are now AI-generated based on real system metrics
 
 function updateIncidents(state: GameState, _dt: number) {
-  let incidentsResolvedThisTick = 0;
+  let mitigatedThisTick = 0;
+  let autoResolvedThisTick = 0;
   
   state.activeIncidents = state.activeIncidents.filter(incident => {
     let wasResolved = false;
     
     // AI-generated incidents
     if (incident.aiGenerated) {
-      const elapsed = (Date.now() - incident.startTime) / 1000;
-      
+      const elapsed = state.elapsedSim - incident.startSim;
+
       // Auto-resolve AI incidents after 300s (outagetimer is for node-down countdown, not auto-resolve)
       const autoResolveTime = 300;
       if (elapsed > autoResolveTime) {
         state.resolvedIncidents++;
-        incidentsResolvedThisTick++;
+        autoResolvedThisTick++;
         wasResolved = true;
         state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       }
@@ -856,10 +879,10 @@ function updateIncidents(state: GameState, _dt: number) {
       // Fully mitigated (player resolved it!)
       if (!wasResolved && incident.mitigationLevel >= 1.0) {
         state.resolvedIncidents++;
-        incidentsResolvedThisTick++;
+        mitigatedThisTick++;
         wasResolved = true;
         state.incidentHistory.push({ id: incident.id, name: (incident as any).aiIncidentName || incident.id, severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
-        
+
         // O4: Direct call instead of dynamic import
         tlog.success(`🎉 Incident resolved! Reputation +${incident.severity === 'CRIT' ? '5' : incident.severity === 'WARN' ? '3' : '1'}`);
       }
@@ -871,12 +894,12 @@ function updateIncidents(state: GameState, _dt: number) {
     const incidentDef = INCIDENTS.find(i => i.id === incident.definitionId);
     if (!incidentDef) return false;
 
-    const elapsed = (Date.now() - incident.startTime) / 1000;
+    const elapsed = state.elapsedSim - incident.startSim;
 
     // Auto-resolve
     if (incidentDef.autoResolveSeconds && elapsed > incidentDef.autoResolveSeconds) {
       state.resolvedIncidents++;
-      incidentsResolvedThisTick++;
+      autoResolvedThisTick++;
       state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: false });
       return false;
     }
@@ -884,7 +907,7 @@ function updateIncidents(state: GameState, _dt: number) {
     // Fully mitigated (player resolved it!)
     if (incident.mitigationLevel >= 1.0) {
       state.resolvedIncidents++;
-      incidentsResolvedThisTick++;
+      mitigatedThisTick++;
       state.incidentHistory.push({ id: incident.id, name: incident.definitionId?.replace(/_/g, ' ') || 'Unknown', severity: incident.severity, targetNode: incident.targetNodeId, startTime: incident.startTime, endTime: Date.now(), wasResolved: true });
       return false;
     }
@@ -893,40 +916,42 @@ function updateIncidents(state: GameState, _dt: number) {
   });
 
   // REWARD: Positive effects for resolving incidents!
-  if (incidentsResolvedThisTick > 0) {
-    // Reputation boost (more for critical incidents)
-    const reputationBoost = incidentsResolvedThisTick * 2; // +2 per incident
-    state.reputation = Math.min(100, state.reputation + reputationBoost);
-    
+  const resolvedThisTick = mitigatedThisTick + autoResolvedThisTick;
+  if (resolvedThisTick > 0) {
+    const boost = mitigatedThisTick * GAME_CONFIG.incidents.mitigatedReputationReward
+                + autoResolvedThisTick * GAME_CONFIG.incidents.autoResolveReputationReward;
+    state.reputation = Math.min(100, state.reputation + boost);
+
     // O4: Direct call instead of dynamic import
-    tlog.success(`✨ Resolved ${incidentsResolvedThisTick} incident(s)! Reputation +${reputationBoost}`);
+    tlog.success(`✨ Resolved ${resolvedThisTick} incident(s) (${mitigatedThisTick} fixed) — reputation +${boost.toFixed(1)}`);
   }
   
   // BREATHER MECHANIC: After resolving incidents, suppress new ones for 30s
   // BAL-7 FIX: Trigger when no CRIT/WARN remain (ignore lingering INFO incidents)
   const hasSeriousIncidents = state.activeIncidents.some(i => i.severity === 'CRIT' || i.severity === 'WARN');
-  if (incidentsResolvedThisTick > 0 && !hasSeriousIncidents) {
+  if (resolvedThisTick > 0 && !hasSeriousIncidents) {
     state.lastCalmPeriodEnd = Date.now() + GAME_CONFIG.session.calmPeriodAfterCritMs;
     tlog.info(`😌 All clear! 30 second breather before next incident wave.`);
   }
 }
 
 function updateActions(state: GameState, _dt: number) {
-  const now = Date.now();
   const mitigationPerAction = GAME_CONFIG.incidents.mitigationPerAction;
 
   // Update mitigation progress for incidents
   state.activeIncidents.forEach(incident => {
     // Find the active (in-progress) mitigation action for this incident
-    const activeAction = state.actionsInProgress.find(
-      a => a.mitigatingIncidentId === incident.id && now < a.endTime
-    );
-    
+    const activeAction = state.actionsInProgress.find(a => {
+      if (a.mitigatingIncidentId !== incident.id) return false;
+      const durationSec = (a.endTime - a.startTime) / 1000;
+      return state.elapsedSim < a.startSim + durationSec;
+    });
+
     if (activeAction) {
-      const duration = activeAction.endTime - activeAction.startTime;
-      const elapsed = Math.max(0, now - activeAction.startTime);
-      const progress = Math.min(1.0, elapsed / duration);
-      
+      const durationSec = (activeAction.endTime - activeAction.startTime) / 1000;
+      const elapsed = Math.max(0, state.elapsedSim - activeAction.startSim);
+      const progress = Math.min(1.0, elapsed / durationSec);
+
       // Show real-time progress: base mitigation + current action progress
       // Use config for mitigation amount
       incident.mitigationProgress = Math.min(1.0, incident.mitigationLevel + (progress * mitigationPerAction));
@@ -938,13 +963,20 @@ function updateActions(state: GameState, _dt: number) {
 
   // Remove completed actions and finalize their mitigation
   state.actionsInProgress = state.actionsInProgress.filter(action => {
-    if (now >= action.endTime) {
+    const durationSec = (action.endTime - action.startTime) / 1000;
+    if (state.elapsedSim >= action.startSim + durationSec) {
       // O4: Direct calls instead of dynamic imports
       soundNotifications.playActionComplete();
       tlog.success('═══════════════════════════════════════════════');
       tlog.success(`✅ ACTION COMPLETED: ${action.actionId}`);
       tlog.success('═══════════════════════════════════════════════');
-      
+
+      // Accumulate recurring cost delta when the action completes (not when it starts)
+      const completedActionDef = ACTIONS.find(a => a.id === action.actionId);
+      if (completedActionDef?.recurringCostDelta) {
+        state.recurringCostAdjustment += completedActionDef.recurringCostDelta;
+      }
+
       // Action complete - finalize mitigation if it was mitigating an incident
       if (action.mitigatingIncidentId) {
         const incident = state.activeIncidents.find(i => i.id === action.mitigatingIncidentId);
@@ -969,13 +1001,15 @@ function updateActions(state: GameState, _dt: number) {
               const targetNode = state.architecture.nodes.get(incident.targetNodeId);
               if (targetNode && targetNode.specificMetrics) {
                 tlog.info(`📈 Applying metric improvements for ${targetNode.name}:`);
-                
+
                 for (const [metricKey, improvement] of Object.entries(metricImprovements)) {
                   if (metricKey in targetNode.specificMetrics) {
                     if (typeof improvement === 'number') {
+                      const delta = Number(improvement);
+                      if (!Number.isFinite(delta)) continue;
                       const currentValue = targetNode.specificMetrics[metricKey];
                       if (typeof currentValue === 'number') {
-                        const finalImprovement = improvement * 0.7;
+                        const finalImprovement = delta * 0.7;
                         const newValue = currentValue + finalImprovement;
                         targetNode.specificMetrics[metricKey] = clampMetric(targetNode, metricKey, newValue);
                         
@@ -1014,7 +1048,24 @@ function updateStress(state: GameState, dt: number) {
   state.techDebt = Math.max(0, state.techDebt - GAME_CONFIG.stress.techDebtDecay * dt);
 }
 
-function checkGameOver(state: GameState) {
+function completeDeployments(state: GameState) {
+  const now = Date.now();
+  for (const [id, info] of Array.from(state.deployingComponents.entries())) {
+    if ((now - info.startTime) / 1000 < info.durationSec) continue;
+    state.deployingComponents.delete(id);
+    const bp = COMPONENT_BLUEPRINTS.find(b => b.id === id);
+    if (!bp) continue;
+    if (!deployComponent(state.architecture, id, bp.edges)) {
+      tlog.warn(`⚠️ ${bp.name} deployment produced no node — check basePositions/blueprint id`);
+      continue;
+    }
+    state.deployedComponents.add(id);
+    state.componentDeploymentHistory.push({ componentId: id, deployedAt: now, cost: bp.deployCost });
+    tlog.success(`✅ ${bp.name} is now live!`);
+  }
+}
+
+function checkGameOver(state: GameState, dt: number) {
   if (state.cash < GAME_CONFIG.economy.bankruptcyThreshold) {
     state.gameOver = true;
     state.gameOverReason = 'Bankruptcy - Cash depleted';
@@ -1022,7 +1073,7 @@ function checkGameOver(state: GameState) {
 
   if (state.reputation <= 0) {
     // O5: Use typed field instead of (state as any) cast
-    state.reputationZeroTimer += 1;
+    state.reputationZeroTimer += dt;
     
     // Game over only if reputation stays at 0 for configured grace period
     if (state.reputationZeroTimer >= GAME_CONFIG.economy.reputationGameOverGracePeriod) {

@@ -48,7 +48,6 @@ class AIGameMaster {
   private totalApiCalls: number = 0;
   private estimatedTokensUsed: number = 0;
   private estimatedCostUSD: number = 0;
-  private lastApiCallTime: number = 0;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -66,11 +65,6 @@ class AIGameMaster {
     
     // Check session duration
     if (this.sessionStartTime > 0 && (now - this.sessionStartTime) >= cfg.maxDurationMs) {
-      return false;
-    }
-    
-    // Check inactivity (if last call was too long ago, something's wrong)
-    if (this.lastApiCallTime > 0 && (now - this.lastApiCallTime) >= cfg.inactivityTimeoutMs) {
       return false;
     }
     
@@ -105,7 +99,6 @@ class AIGameMaster {
     this.totalApiCalls = 0;
     this.estimatedTokensUsed = 0;
     this.estimatedCostUSD = 0;
-    this.lastApiCallTime = Date.now();
   }
 
   async generateIncident(currentState: GameState): Promise<AIIncidentResponse | null> {
@@ -461,7 +454,6 @@ Respond JSON only.`;
 
   private async callOpenAI(): Promise<string> {
     this.totalApiCalls++;
-    this.lastApiCallTime = Date.now();
 
     const { content, usage } = await chatJSON(this.apiKey, this.conversationHistory, 1.2);
     if (usage) {

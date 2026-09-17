@@ -16,7 +16,10 @@ export const GAME_CONFIG = {
   economy: {
     revenuePerUserPerDay: 25,
     bankruptcyThreshold: -5000,
-    reputationGameOverGracePeriod: 60, // seconds at 0 before game over
+    // Phase 3 soft-floor: reputation must stay at 0 for this many simulated seconds before game over.
+    // At dt=0.1s/tick: 3000s / 0.1 = 30,000 ticks = 3000 real seconds (~50 min) — generous enough
+    // to weather prolonged incident waves without premature game-over.
+    reputationGameOverGracePeriod: 3000,
   },
 
   // === USER GROWTH ===
@@ -57,7 +60,14 @@ export const GAME_CONFIG = {
 
   // === INCIDENT SYSTEM ===
   incidents: {
+    // Global scale on template baseRatePerMinute (they sum to ~1.36/min unscaled).
+    spawnRateMultiplier: 0.5,
+    maxConcurrent: 6,
     mitigationPerAction: 1.0, // 100% mitigation per action (1 action = full resolution)
+    // Reputation for a resolved incident. Auto-resolve pays less than acting, so
+    // ignoring an incident is never as good as fixing it.
+    mitigatedReputationReward: 3,
+    autoResolveReputationReward: 0,
     // AI Incident effect caps (prevent death spiral)
     aiEffectCaps: {
       maxHealthDecayPerSec: 0.003, // Max 0.3% health loss per second per node (even with multiple incidents)
@@ -67,6 +77,7 @@ export const GAME_CONFIG = {
     },
     // Immediate mitigation when action starts (gives player hope)
     immediateMitigationOnActionStart: 0.3, // 30% mitigation applied immediately when action starts
+    spreadAfterSeconds: 45,
   },
 
   // === AI / OPENAI ===
@@ -79,6 +90,8 @@ export const GAME_CONFIG = {
     // 1500 truncated the "log" task type (50-100 log lines) mid-JSON; 4000 is only a
     // ceiling, billing follows actual usage (incidents ~1000, log tasks ~1900)
     maxCompletionTokens: 4000,
+    // Only flavour WARN/CRIT to keep AI spend reasonable (INFO is too noisy).
+    flavourSeverities: ['WARN', 'CRIT'] as ReadonlyArray<'INFO' | 'WARN' | 'CRIT'>,
   },
 
   // === SESSION MANAGEMENT ===
@@ -112,7 +125,9 @@ export const GAME_CONFIG = {
   metricRecovery: {
     baseRecoveryRate: 0.03, // 3%/sec recovery toward baseline when no incident
     incidentRecoveryRate: 0.01, // 1%/sec partial recovery even during incidents
-    healthRecoveryDuringIncident: 0.3, // 30% of normal health recovery rate during incidents
+    // Recovery is suppressed entirely while a node is under an active incident;
+    // it resumes on the tick after the incident clears.
+    healthRecoveryDuringIncident: 0,
   },
 
   // === ACTION TIMINGS ===
@@ -138,7 +153,16 @@ export const GAME_CONFIG = {
   simulation: {
     tickIntervalMs: 100, // real time between ticks
     defaultSimDt: 1, // simulated seconds per tick
-    uptimeWindowSize: 300, // 5 minutes
+    uptimeWindowSeconds: 300, // rolling window for the uptime average
+    tickSeconds: 0.1,         // real seconds per tick; App's interval must match
+  },
+
+  // === TRAFFIC ===
+  traffic: {
+    // Requests per second contributed by each active user. Tuned so the app cluster
+    // reaches its 0.7 latency knee in the first few minutes at starting capacity,
+    // making the first cache/CDN deployment feel like relief rather than bookkeeping.
+    rpsPerActiveUser: 0.75,
   },
 
   // === ACTIVITY RATE (time of day) ===
