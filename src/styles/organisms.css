@@ -1,0 +1,75 @@
+/* src/styles/organisms.css
+   Organism-level compositions. Panel-wide and section-wide rules. */
+
+/* ── ORGANISM: HUD Bar ───────────────────────────────────────────
+   Override to 72px height for breathing room.                     */
+
+.hud-bar {
+  height: 72px;
+  min-height: 72px;
+}
+
+/* ── ORGANISM: Session Countdown Bar ────────────────────────────
+   Thin strip immediately below the HUD bar showing time remaining. */
+
+.session-bar {
+  height: 3px;
+  background: var(--border-dim);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.session-bar__fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--interactive);
+  transition: width 1s linear;
+}
+.session-bar--warning .session-bar__fill {
+  background: var(--status-warn);
+}
+.session-bar--critical .session-bar__fill {
+  background: var(--status-crit);
+  animation: sev-pulse 1.2s ease-in-out infinite;
+}
+
+/* ── ORGANISM: Arch Map — Node Type Badges ───────────────────────
+   CSS classes for the SVG <rect> type-badge backgrounds.
+   Applied via className on SVG <g> elements in ArchMap.tsx        */
+
+.node-type-badge-dns   { fill: rgba(167,139,250,0.25); }
+.node-type-badge-app   { fill: rgba(96,165,250,0.20);  }
+.node-type-badge-db    { fill: rgba(245,158,11,0.20);  }
+.node-type-badge-cache { fill: rgba(0,217,151,0.18);   }
+.node-type-badge-net   { fill: rgba(96,165,250,0.15);  }
+.node-type-badge-queue { fill: rgba(251,146,60,0.20);  }
+.node-type-badge-obs   { fill: rgba(163,230,53,0.20);  }
+
+/* ── ORGANISM: Node Deploy Entrance Animation ────────────────────
+   Applied to a new node group in ArchMap.tsx for 400ms after deploy. */
+
+@keyframes node-enter {
+  from { opacity: 0; transform: scale(0.75); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.node-entering {
+  animation: node-enter var(--motion-slow) var(--ease-spring) forwards;
+  transform-origin: center;
+}
+
+/* ── ORGANISM: Detail Panel ──────────────────────────────────────
+   Reduced default width; content drives expansion via JS          */
+
+/* Already handled via gameConfig.ts + useResizable hook.
+   No CSS override needed — defaults are in gameConfig.ui.         */
+
+/* ── ORGANISM: Panel Header ──────────────────────────────────────
+   Standardise font role for all panel h2 headers.                 */
+
+.panel-header h2 {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}

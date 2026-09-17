@@ -1,0 +1,94 @@
+/* src/styles/molecules.css
+   Molecule-level compositions built from atoms.
+   These classes upgrade existing element structures.              */
+
+/* ── MOLECULE: Incident Card ────────────────────────────────────
+   Wraps SevDot + title + target + mitigation bar.
+   Applied via severity modifier on existing .incident-item class. */
+
+.incident-item {
+  /* Base already in theme.css — these add severity-specific fills */
+}
+.incident-item.severity-critical {
+  background: rgba(239, 68, 68, 0.07);
+  border-left: 4px solid var(--status-crit);
+}
+.incident-item.severity-warning {
+  background: rgba(245, 158, 11, 0.05);
+  border-left: 3px solid var(--status-warn);
+}
+.incident-item.severity-info {
+  background: transparent;
+  border-left: 2px solid var(--status-info);
+}
+
+/* CRIT card title gets extra weight */
+.incident-item.severity-critical .incident-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+/* ── MOLECULE: HUD Metric Group ─────────────────────────────────
+   Label above, value below. Already structured correctly — these
+   are overrides for spacing and font roles.                       */
+
+.hud-label {
+  font-size: 0.72rem;        /* raised from 0.7rem for WCAG         */
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── MOLECULE: Quick Action Button ──────────────────────────────
+   Name + cost. Category header precedes a group of these.        */
+
+.action-category-header {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-dim);
+  margin-bottom: 0.4rem;
+  margin-top: 0.6rem;
+}
+.action-category-header:first-child {
+  margin-top: 0;
+}
+
+/* Action name text inside quick-action button */
+.action-name {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+}
+.action-cost {
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── MOLECULE: In-Progress Spinner ──────────────────────────────
+   Replaces ⏳ emoji in action buttons.                            */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.action-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--border-bright);
+  border-top-color: var(--interactive);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
