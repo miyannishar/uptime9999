@@ -6,6 +6,7 @@ import { getResolutionActions } from '../sim/incidentActions';
 import { generateLocalTask } from '../sim/localTaskGenerator';
 import TaskModal from './TaskModal';
 import type { TaskData } from '../services/taskGenerator';
+import { AiBadge } from './atoms';
 
 interface DetailPanelProps {
   state: GameState;
@@ -115,19 +116,19 @@ export default function DetailPanel({
             className={`tab-button ${activeTab === 'node' ? 'active' : ''}`}
             onClick={() => setActiveTab('node')}
           >
-            📊 Node
+            Node
           </button>
           <button
             className={`tab-button ${activeTab === 'incident' ? 'active' : ''}`}
             onClick={() => setActiveTab('incident')}
           >
-            🚨 Incident
+            Incident
           </button>
           <button
             className={`tab-button ${activeTab === 'strategy' ? 'active' : ''}`}
             onClick={() => setActiveTab('strategy')}
           >
-            📈 Strategy
+            Strategy
           </button>
         </div>
       </div>
@@ -186,7 +187,7 @@ export default function DetailPanel({
                 {/* Component-Specific Metrics */}
                 {selectedNode.specificMetrics && (
                   <div className="specific-metrics">
-                    <h4>📊 Component Metrics</h4>
+                    <h4>Component Metrics</h4>
                     <div className="metrics-grid">
                       {Object.entries(selectedNode.specificMetrics).map(([key, value]) => {
                         // Format the value nicely
@@ -259,7 +260,7 @@ export default function DetailPanel({
                 </h3>
                 {selectedIncident.aiGenerated && (
                   <div className="ai-badge">
-                    <span>🤖 AI-Generated Incident</span>
+                    <span><AiBadge /> AI-Generated Incident</span>
                   </div>
                 )}
                 <div className="incident-details">
@@ -334,7 +335,7 @@ export default function DetailPanel({
                         })}
                       </div>
                       <p className="related-incidents-note">
-                        💡 Fixing this incident will fully resolve all related incidents (shared root cause)
+                        Fixing this incident will fully resolve all related incidents (shared root cause)
                       </p>
                     </div>
                   )}
@@ -370,8 +371,8 @@ export default function DetailPanel({
                             disabled={!canExecute || isInProgress}
                           >
                             <div className="action-name">
-                              🤖 {aiAction.actionName}
-                              {isInProgress && ' ⏳'}
+                              <AiBadge /> {aiAction.actionName}
+                              {isInProgress && <span className="action-spinner" />}
                             </div>
                             <div className="action-description">{aiAction.description}</div>
                             <div className="action-cost">
@@ -431,7 +432,7 @@ export default function DetailPanel({
                                 >
                                   <div className="action-name">
                                     {action.name}
-                                    {isInProgress && ' ⏳'}
+                                    {isInProgress && <span className="action-spinner" />}
                                   </div>
                                   <div className="action-cost">
                                     ${action.oneTimeCost}
