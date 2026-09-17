@@ -17,17 +17,48 @@ interface ArchMapProps {
   onDeployComponent?: (componentId: string) => void;
 }
 
+const NODE_TYPE_LABEL: Record<string, string> = {
+  DNS: 'DNS', CDN: 'CDN', WAF: 'WAF', GLB: 'GLB', RLB: 'RLB',
+  APP: 'APP', APIGW: 'API', CACHE: 'CACHE', QUEUE: 'QUEUE',
+  WORKERS: 'WORK', DB_PRIMARY: 'DB', DB_REPLICA: 'DB·R',
+  STORAGE: 'STORE', OBSERVABILITY: 'OBS', SERVICE_MESH: 'MESH',
+};
+
 export default function ArchMap({ architecture, activeIncidents, onSelectNode, selectedNodeId, deployedComponents, deployingComponents, users, elapsedSec, totalIncidents, cash, onDeployComponent }: ArchMapProps) {
   const { nodes, edges } = architecture;
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Zoom and pan state
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
+
+  // Deploy entrance animation (F2)
+  const [recentlyDeployed, setRecentlyDeployed] = useState<Set<string>>(new Set());
+  const prevDeployedRef = useRef<Set<string>>(deployedComponents);
+
+  useEffect(() => {
+    const newlyDeployed: string[] = [];
+    deployedComponents.forEach(id => {
+      if (!prevDeployedRef.current.has(id)) {
+        newlyDeployed.push(id);
+      }
+    });
+    if (newlyDeployed.length > 0) {
+      setRecentlyDeployed(prev => new Set([...prev, ...newlyDeployed]));
+      setTimeout(() => {
+        setRecentlyDeployed(prev => {
+          const next = new Set(prev);
+          newlyDeployed.forEach(id => next.delete(id));
+          return next;
+        });
+      }, 600);
+    }
+    prevDeployedRef.current = new Set(deployedComponents);
+  }, [deployedComponents]);
 
   // Layout positions for nodes (hand-crafted for clarity, scaled up significantly with more spacing)
   const basePositions: Record<string, { x: number; y: number }> = {
@@ -58,10 +89,10 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
 
   // Calculate positions for all nodes (including dynamic instances)
   const positions: Record<string, { x: number; y: number }> = {};
-  
+
   // Group nodes by base type for stacking instances
   const nodeGroups = new Map<string, Array<{ id: string; instanceNumber?: number }>>();
-  
+
   Array.from(nodes.values()).forEach(node => {
     const baseId = node.id.split('_')[0]; // Get base ID (e.g., 'app' from 'app_2')
     if (!nodeGroups.has(baseId)) {
@@ -69,11 +100,11 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
     }
     nodeGroups.get(baseId)!.push({ id: node.id, instanceNumber: node.instanceNumber });
   });
-  
+
   // Assign positions - stack instances vertically
   nodeGroups.forEach((instances, baseId) => {
     const basePos = basePositions[baseId] || basePositions[instances[0]?.id] || { x: 200, y: 200 };
-    
+
     instances.forEach((instance, idx) => {
       if (instance.instanceNumber && instance.instanceNumber > 1) {
         // Stack additional instances to the right
@@ -87,11 +118,10 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
       }
     });
   });
-  
+
   // Fallback for any nodes without positions
   Array.from(nodes.values()).forEach(node => {
     if (!positions[node.id]) {
-      // Try to find base position or use default
       const baseId = node.id.split('_')[0];
       positions[node.id] = basePositions[baseId] || basePositions[node.id] || { x: 200, y: 200 };
     }
@@ -121,9 +151,9 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
   // Render component-specific metrics based on type
   const renderComponentSpecificMetrics = (node: any, pos: { x: number; y: number }) => {
     const metrics = node.specificMetrics || {};
-    const fontSize = 16;
+    const fontSize = 14;
     const fontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace";
-    let yOffset = 200;
+    const yOffset = 155;
     const metricsToShow: Array<{ label: string; value: string; color: string }> = [];
 
     switch (node.type) {
@@ -231,7 +261,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
         {metricsToShow.map((metric, idx) => (
           <text
             key={idx}
-            x={pos.x + 30 + (idx * 80)}
+            x={pos.x + 20 + (idx * 70)}
             y={pos.y + yOffset}
             fill={metric.color}
             fontSize={fontSize}
@@ -263,7 +293,7 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
 
   // Handle mouse drag for panning
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 0) { // Left mouse button
+    if (e.button === 0) {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setLastPan(pan);
@@ -272,7 +302,6 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (isDragging) {
-      // Much higher sensitivity - multiply by 2 for very responsive dragging
       const deltaX = (e.clientX - dragStart.x) * 2;
       const deltaY = (e.clientY - dragStart.y) * 2;
       setPan({
@@ -290,7 +319,6 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
     setIsDragging(false);
   };
 
-  // Reset zoom/pan button
   const handleReset = () => {
     setZoom(1.0);
     setPan({ x: 0, y: 0 });
@@ -299,19 +327,19 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
   return (
     <div className="arch-map" ref={containerRef}>
       <div className="panel-header">
-        <h2>🗺️ Architecture Map</h2>
+        <h2>Architecture</h2>
         <div className="map-controls">
           <button className="map-control-button" onClick={handleReset} title="Reset zoom/pan">
-            🔍 Reset
+            Reset
           </button>
           <span className="zoom-indicator">{Math.round(zoom * 100)}%</span>
         </div>
       </div>
 
-      <svg 
+      <svg
         ref={svgRef}
-        className="arch-svg" 
-        viewBox="0 0 2000 2000" 
+        className="arch-svg"
+        viewBox="0 0 2000 2000"
         xmlns="http://www.w3.org/2000/svg"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -334,410 +362,464 @@ export default function ArchMap({ architecture, activeIncidents, onSelectNode, s
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="8"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="rgba(0,217,151,0.40)" />
+          </marker>
         </defs>
 
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Render edges first */}
           {edges.map((edge, idx) => {
-          const from = positions[edge.from];
-          const to = positions[edge.to];
-          if (!from || !to) return null;
+            const from = positions[edge.from];
+            const to = positions[edge.to];
+            if (!from || !to) return null;
 
-          const fromNode = nodes.get(edge.from);
-          const toNode = nodes.get(edge.to);
-          if (!fromNode?.enabled || !toNode?.enabled) return null;
+            const fromNode = nodes.get(edge.from);
+            const toNode = nodes.get(edge.to);
+            if (!fromNode?.enabled || !toNode?.enabled) return null;
 
-          return (
-            <g key={`edge-${idx}`}>
-                <line
-                 x1={from.x + 150}
-                 y1={from.y + 100}
-                 x2={to.x + 150}
-                 y2={to.y + 100}
-                 stroke="#00ffaa44"
-                 strokeWidth="5"
-                 strokeDasharray="8,8"
+            return (
+              <g key={`edge-${idx}`}>
+                <path
+                  d={`M${from.x + 120},${from.y + 80} L${to.x + 120},${to.y + 80}`}
+                  stroke="rgba(0,217,151,0.25)"
+                  strokeWidth="2"
+                  strokeDasharray="6,6"
+                  markerEnd="url(#arrow)"
+                  fill="none"
                 />
-            </g>
-          );
-        })}
+              </g>
+            );
+          })}
 
-        {/* Render nodes */}
-        {Array.from(nodes.values()).map(node => {
-          const pos = positions[node.id];
-          if (!pos) return null;
+          {/* Render nodes */}
+          {Array.from(nodes.values()).map(node => {
+            const pos = positions[node.id];
+            if (!pos) return null;
 
-          const status = getNodeStatus(node);
-          const color = getStatusColor(status);
-          const isSelected = selectedNodeId === node.id;
-          const utilizationPercent = Math.min(100, (node.utilization * 100));
-          const healthPercent = node.health * 100;
+            const status = getNodeStatus(node);
+            const color = getStatusColor(status);
+            const isSelected = selectedNodeId === node.id;
+            const utilizationPercent = Math.min(100, (node.utilization * 100));
+            const healthPercent = node.health * 100;
 
-          // Check if this node has active incidents
-          const nodeIncidents = activeIncidents.filter(inc => inc.targetNodeId === node.id);
-          const hasCritIncident = nodeIncidents.some(inc => inc.severity === 'CRIT');
-          const hasWarnIncident = nodeIncidents.some(inc => inc.severity === 'WARN');
+            // Check if this node has active incidents
+            const nodeIncidents = activeIncidents.filter(inc => inc.targetNodeId === node.id);
+            const hasCritIncident = nodeIncidents.some(inc => inc.severity === 'CRIT');
+            const hasWarnIncident = nodeIncidents.some(inc => inc.severity === 'WARN');
 
-          return (
-            <g
-              key={node.id}
-              onClick={() => onSelectNode(node.id)}
-              style={{ cursor: 'pointer' }}
-              className={`node-group ${status === 'degraded' ? 'node-degraded' : ''} ${status === 'down' ? 'node-down' : ''}`}
-            >
-              {/* Incident indicator glow */}
-              {hasCritIncident && (
-                <rect
-                 x={pos.x - 8}
-                 y={pos.y - 8}
-                 width="316"
-                 height="216"
-                 fill="none"
-                 stroke="#ff3366"
-                 strokeWidth="8"
-                 rx="12"
-                 opacity="0.6"
-                 className="incident-glow-crit"
-                />
-              )}
-              {hasWarnIncident && !hasCritIncident && (
-                <rect
-                 x={pos.x - 6}
-                 y={pos.y - 6}
-                 width="312"
-                 height="212"
-                 fill="none"
-                 stroke="#ffaa00"
-                 strokeWidth="7"
-                 rx="11"
-                 opacity="0.5"
-                 className="incident-glow-warn"
-                />
-              )}
-
-              {/* Scaling glow (visible at all scaling levels) */}
-              {node.scaling.current > 1 && (
-                <rect
-                 x={pos.x - 6}
-                 y={pos.y - 6}
-                 width={300 + 12}
-                 height={200 + 12}
-                 fill="none"
-                 stroke="#00ffaa"
-                 strokeWidth="6"
-                 rx="11"
-                 opacity={node.scaling.current > 5 ? 0.6 : 0.3}
-                 className="scale-border-glow"
-                />
-              )}
-
-              {/* Node box - grows slightly when scaled */}
-              <rect
-                x={pos.x}
-                y={pos.y}
-                width={300 + (node.scaling.current > 1 ? 6 : 0)}
-                height={200 + (node.scaling.current > 1 ? 6 : 0)}
-                fill="#1a1a2e"
-                stroke={node.scaling.current > 1 ? '#00ffaa' : color}
-                strokeWidth={isSelected ? 6 : (node.scaling.current > 1 ? 5 : 4)}
-                rx="10"
-                filter={status === 'down' || status === 'degraded' ? 'url(#glow)' : (node.scaling.current > 1 ? 'url(#scaleGlow)' : '')}
-                className={node.scaling.current > 1 ? 'node-scaled-up' : ''}
-              />
-
-              {/* Node name */}
-              <text
-                x={pos.x + 150}
-                y={pos.y + 50}
-                textAnchor="middle"
-                fill="#ffffff"
-                fontSize="28"
-                fontWeight="bold"
+            return (
+              <g
+                key={node.id}
+                onClick={() => onSelectNode(node.id)}
+                style={{ cursor: 'pointer' }}
+                className={`node-group ${status === 'degraded' ? 'node-degraded' : ''} ${status === 'down' ? 'node-down' : ''} ${recentlyDeployed.has(node.id) ? 'node-entering' : ''}`}
               >
-                {node.name}
-              </text>
-
-              {/* Utilization bar */}
-              <rect
-                x={pos.x + 30}
-                y={pos.y + 78}
-                width="240"
-                height="22"
-                fill="#333"
-                rx="5"
-              />
-              <rect
-                x={pos.x + 30}
-                y={pos.y + 78}
-                width={utilizationPercent * 2.4}
-                height="22"
-                fill={utilizationPercent > 100 ? '#ff3366' : utilizationPercent > 80 ? '#ffaa00' : '#00ff88'}
-                rx="5"
-              />
-
-              {/* Health bar */}
-              <rect
-                x={pos.x + 30}
-                y={pos.y + 110}
-                width="240"
-                height="22"
-                fill="#333"
-                rx="5"
-              />
-              <rect
-                x={pos.x + 30}
-                y={pos.y + 110}
-                width={healthPercent * 2.4}
-                height="22"
-                fill={healthPercent < 30 ? '#ff3366' : healthPercent < 70 ? '#ffaa00' : '#00ff88'}
-                rx="5"
-              />
-
-              {/* Metrics display - Health, Capacity, Utilization */}
-              <g className="node-metrics">
-                {/* Health metric */}
-                <text
-                  x={pos.x + 30}
-                  y={pos.y + 152}
-                  fill="#00ffaa"
-                  fontSize="20"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  fontWeight="600"
-                >
-                  H:{Math.round(healthPercent)}%
-                </text>
-                
-                {/* Capacity metric */}
-                <text
-                  x={pos.x + 150}
-                  y={pos.y + 152}
-                  fill="#00aaff"
-                  fontSize="20"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  textAnchor="middle"
-                  fontWeight="600"
-                >
-                  C:{Math.round(node.capacity / 1000)}k
-                </text>
-                
-                {/* Utilization metric */}
-                <text
-                  x={pos.x + 270}
-                  y={pos.y + 152}
-                  fill={utilizationPercent > 80 ? '#ffaa00' : '#00ffaa'}
-                  fontSize="20"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  textAnchor="end"
-                  fontWeight="600"
-                >
-                  U:{Math.round(utilizationPercent)}%
-                </text>
-              </g>
-
-              {/* Additional metrics row - Scaling, Errors, Latency */}
-              <g className="node-metrics-secondary">
-                {/* Scaling instances */}
-                <text
-                  x={pos.x + 30}
-                  y={pos.y + 180}
-                  fill="#00ffaa"
-                  fontSize="18"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  fontWeight="600"
-                >
-                  ×{node.scaling.current}
-                </text>
-                
-                {/* Error rate */}
-                <text
-                  x={pos.x + 150}
-                  y={pos.y + 180}
-                  fill={node.errorRate > 0.1 ? '#ff3366' : '#888'}
-                  fontSize="18"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  textAnchor="middle"
-                  fontWeight="600"
-                >
-                  E:{(node.errorRate * 100).toFixed(1)}%
-                </text>
-                
-                {/* Latency */}
-                <text
-                  x={pos.x + 270}
-                  y={pos.y + 180}
-                  fill={node.latency > 500 ? '#ffaa00' : '#888'}
-                  fontSize="18"
-                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                  textAnchor="end"
-                  fontWeight="600"
-                >
-                  L:{Math.round(node.latency)}ms
-                </text>
-              </g>
-
-              {/* Component-specific metrics (dynamic based on type) */}
-              {renderComponentSpecificMetrics(node, pos)}
-
-              {/* Instance badge (if part of redundancy group) */}
-              {node.redundancyGroup && node.instanceNumber && (
-                <g>
-                  <circle
-                    cx={pos.x + 260}
-                    cy={pos.y + 30}
-                    r="18"
-                    fill="#00ffaa"
-                    opacity="0.9"
+                {/* Incident indicator glow */}
+                {hasCritIncident && (
+                  <rect
+                    x={pos.x - 8}
+                    y={pos.y - 8}
+                    width="256"
+                    height="176"
+                    fill="none"
+                    stroke="#ff3366"
+                    strokeWidth="8"
+                    rx="12"
+                    opacity="0.6"
+                    className="incident-glow-crit"
                   />
-                  <text
-                    x={pos.x + 260}
-                    y={pos.y + 37}
-                    textAnchor="middle"
-                    fill="#0a0a0f"
-                    fontSize="20"
-                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                    fontWeight="bold"
-                  >
-                    #{node.instanceNumber}
-                  </text>
-                </g>
-              )}
+                )}
+                {hasWarnIncident && !hasCritIncident && (
+                  <rect
+                    x={pos.x - 6}
+                    y={pos.y - 6}
+                    width="252"
+                    height="172"
+                    fill="none"
+                    stroke="#ffaa00"
+                    strokeWidth="7"
+                    rx="11"
+                    opacity="0.5"
+                    className="incident-glow-warn"
+                  />
+                )}
 
-              {/* Primary indicator (star) */}
-              {node.isPrimary && (
+                {/* Scaling glow */}
+                {node.scaling.current > 1 && (
+                  <rect
+                    x={pos.x - 6}
+                    y={pos.y - 6}
+                    width={240 + 12}
+                    height={160 + 12}
+                    fill="none"
+                    stroke="#00ffaa"
+                    strokeWidth="6"
+                    rx="11"
+                    opacity={node.scaling.current > 5 ? 0.6 : 0.3}
+                    className="scale-border-glow"
+                  />
+                )}
+
+                {/* Node box */}
+                <rect
+                  x={pos.x}
+                  y={pos.y}
+                  width={240 + (node.scaling.current > 1 ? 6 : 0)}
+                  height={160 + (node.scaling.current > 1 ? 6 : 0)}
+                  fill="#1a1a2e"
+                  stroke={node.scaling.current > 1 ? '#00ffaa' : color}
+                  strokeWidth={isSelected ? 6 : (node.scaling.current > 1 ? 5 : 4)}
+                  rx="10"
+                  filter={status === 'down' || status === 'degraded' ? 'url(#glow)' : (node.scaling.current > 1 ? 'url(#scaleGlow)' : '')}
+                  className={node.scaling.current > 1 ? 'node-scaled-up' : ''}
+                />
+
+                {/* Type badge — top-right corner */}
+                {NODE_TYPE_LABEL[node.type] && (
+                  <g>
+                    <rect
+                      x={pos.x + 170}
+                      y={pos.y + 8}
+                      width={60}
+                      height={18}
+                      rx={3}
+                      fill="rgba(255,255,255,0.06)"
+                      stroke="rgba(255,255,255,0.12)"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={pos.x + 200}
+                      y={pos.y + 21}
+                      textAnchor="middle"
+                      fill="rgba(255,255,255,0.45)"
+                      fontSize={11}
+                      fontFamily="'Space Grotesk', system-ui, sans-serif"
+                      fontWeight={600}
+                      letterSpacing={0.5}
+                    >
+                      {NODE_TYPE_LABEL[node.type]}
+                    </text>
+                  </g>
+                )}
+
+                {/* Primary indicator (diamond) */}
+                {node.isPrimary && (
+                  <polygon
+                    points={`${pos.x + 120},${pos.y + 30} ${pos.x + 130},${pos.y + 40} ${pos.x + 120},${pos.y + 50} ${pos.x + 110},${pos.y + 40}`}
+                    fill="rgba(245,158,11,0.30)"
+                    stroke="rgba(245,158,11,0.60)"
+                    strokeWidth={1}
+                  />
+                )}
+
+                {/* Node name */}
                 <text
-                  x={pos.x + 240}
-                  y={pos.y + 35}
-                  fill="#ffaa00"
-                  fontSize="24"
+                  x={pos.x + 120}
+                  y={pos.y + 40}
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="22"
                   fontWeight="bold"
                 >
-                  ⭐
+                  {node.name}
                 </text>
-              )}
 
-              {/* Status text */}
-              <text
-                x={pos.x + 150}
-                y={pos.y + 200}
-                textAnchor="middle"
-                fill={color}
-                fontSize="22"
-                fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
-                fontWeight="700"
-              >
-                {status.toUpperCase()}
-              </text>
+                {/* Utilization bar */}
+                <rect
+                  x={pos.x + 20}
+                  y={pos.y + 58}
+                  width="200"
+                  height="18"
+                  fill="#333"
+                  rx="5"
+                />
+                <rect
+                  x={pos.x + 20}
+                  y={pos.y + 58}
+                  width={utilizationPercent * 2.0}
+                  height="18"
+                  fill={utilizationPercent > 100 ? '#ff3366' : utilizationPercent > 80 ? '#ffaa00' : '#00ff88'}
+                  rx="5"
+                />
 
-              {/* Scaling badge indicator (when scaled) */}
-              {node.scaling.current > 1 && (
-                <>
-                  {/* Background badge for scaling indicator */}
-                  <rect
-                    x={pos.x + 220}
-                    y={pos.y + 15}
-                    width="65"
-                    height="32"
-                    fill="#00ffaa"
-                    opacity={node.scaling.current > 5 ? 0.4 : 0.25}
-                    rx="14"
-                    className={node.scaling.current > 1 ? 'scale-badge-glow' : ''}
-                  />
-                  {/* Scaling indicator icon */}
+                {/* Health bar */}
+                <rect
+                  x={pos.x + 20}
+                  y={pos.y + 85}
+                  width="200"
+                  height="18"
+                  fill="#333"
+                  rx="5"
+                />
+                <rect
+                  x={pos.x + 20}
+                  y={pos.y + 85}
+                  width={healthPercent * 2.0}
+                  height="18"
+                  fill={healthPercent < 30 ? '#ff3366' : healthPercent < 70 ? '#ffaa00' : '#00ff88'}
+                  rx="5"
+                />
+
+                {/* Metrics display - Health, Capacity, Utilization */}
+                <g className="node-metrics">
                   <text
-                    x={pos.x + 252.5}
-                    y={pos.y + 36}
-                    textAnchor="middle"
+                    x={pos.x + 20}
+                    y={pos.y + 120}
                     fill="#00ffaa"
-                    fontSize="22"
-                    fontWeight="bold"
-                    className="scale-icon"
+                    fontSize="18"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    fontWeight="600"
                   >
-                    ⬆
+                    H:{Math.round(healthPercent)}%
                   </text>
-                </>
-              )}
+                  <text
+                    x={pos.x + 120}
+                    y={pos.y + 120}
+                    fill="#00aaff"
+                    fontSize="18"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    textAnchor="middle"
+                    fontWeight="600"
+                  >
+                    C:{Math.round(node.capacity / 1000)}k
+                  </text>
+                  <text
+                    x={pos.x + 220}
+                    y={pos.y + 120}
+                    fill={utilizationPercent > 80 ? '#ffaa00' : '#00ffaa'}
+                    fontSize="18"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    textAnchor="end"
+                    fontWeight="600"
+                  >
+                    U:{Math.round(utilizationPercent)}%
+                  </text>
+                </g>
 
-              {/* Health warning indicator */}
-              {node.health < 0.5 && (
+                {/* Additional metrics row - Scaling, Errors, Latency */}
+                <g className="node-metrics-secondary">
+                  <text
+                    x={pos.x + 20}
+                    y={pos.y + 140}
+                    fill="#00ffaa"
+                    fontSize="16"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    fontWeight="600"
+                  >
+                    ×{node.scaling.current}
+                  </text>
+                  <text
+                    x={pos.x + 120}
+                    y={pos.y + 140}
+                    fill={node.errorRate > 0.1 ? '#ff3366' : '#888'}
+                    fontSize="16"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    textAnchor="middle"
+                    fontWeight="600"
+                  >
+                    E:{(node.errorRate * 100).toFixed(1)}%
+                  </text>
+                  <text
+                    x={pos.x + 220}
+                    y={pos.y + 140}
+                    fill={node.latency > 500 ? '#ffaa00' : '#888'}
+                    fontSize="16"
+                    fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                    textAnchor="end"
+                    fontWeight="600"
+                  >
+                    L:{Math.round(node.latency)}ms
+                  </text>
+                </g>
+
+                {/* Component-specific metrics (dynamic based on type) */}
+                {renderComponentSpecificMetrics(node, pos)}
+
+                {/* Instance badge (if part of redundancy group) */}
+                {node.redundancyGroup && node.instanceNumber && (
+                  <g>
+                    <circle
+                      cx={pos.x + 20}
+                      cy={pos.y + 22}
+                      r="15"
+                      fill="#00ffaa"
+                      opacity="0.9"
+                    />
+                    <text
+                      x={pos.x + 20}
+                      y={pos.y + 27}
+                      textAnchor="middle"
+                      fill="#0a0a0f"
+                      fontSize="16"
+                      fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                      fontWeight="bold"
+                    >
+                      #{node.instanceNumber}
+                    </text>
+                  </g>
+                )}
+
+                {/* Status text */}
                 <text
-                  x={pos.x + 270}
-                  y={pos.y + 32}
-                  fontSize="28"
-                  className="health-warning-icon"
+                  x={pos.x + 120}
+                  y={pos.y + 155}
+                  textAnchor="middle"
+                  fill={color}
+                  fontSize="18"
+                  fontFamily="'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace"
+                  fontWeight="700"
                 >
-                  ⚠️
+                  {status.toUpperCase()}
                 </text>
-              )}
-            </g>
-          );
-        })}
 
-        {/* === GHOST SLOTS: Undeployed Components === */}
-        {COMPONENT_BLUEPRINTS.map(bp => {
-          if (deployedComponents.has(bp.id)) return null;
-          const pos = basePositions[bp.id];
-          if (!pos) return null;
+                {/* Scaling badge indicator */}
+                {node.scaling.current > 1 && (
+                  <>
+                    <rect
+                      x={pos.x + 165}
+                      y={pos.y + 30}
+                      width="60"
+                      height="24"
+                      fill="#00ffaa"
+                      opacity={node.scaling.current > 5 ? 0.4 : 0.25}
+                      rx="12"
+                      className={node.scaling.current > 1 ? 'scale-badge-glow' : ''}
+                    />
+                    <text
+                      x={pos.x + 195}
+                      y={pos.y + 46}
+                      textAnchor="middle"
+                      fill="#00ffaa"
+                      fontSize="18"
+                      fontWeight="bold"
+                      className="scale-icon"
+                    >
+                      ⬆
+                    </text>
+                  </>
+                )}
 
-          const isDeploying = deployingComponents.has(bp.id);
-          const deployInfo = deployingComponents.get(bp.id);
-          const { meetsPrereqs, unlocked, visible } = blueprintStatus(bp, deployedComponents, users, elapsedSec, totalIncidents);
-          const isAvailable = unlocked && !isDeploying;
-          const canAfford = cash >= bp.deployCost;
-
-          // Deploying: animated progress
-          if (isDeploying && deployInfo) {
-            const elapsed = (Date.now() - deployInfo.startTime) / 1000;
-            const progress = Math.min(1, elapsed / deployInfo.durationSec);
-            return (
-              <g key={`ghost-${bp.id}`}>
-                <rect x={pos.x} y={pos.y} width="300" height="200" fill="#0a0a1a" stroke="#00ffaa" strokeWidth="3" rx="10" strokeDasharray="0" opacity="0.9" className="deploying-node" />
-                <text x={pos.x + 150} y={pos.y + 50} textAnchor="middle" fill="#00ffaa" fontSize="24" fontWeight="bold">{bp.icon} {bp.name}</text>
-                <text x={pos.x + 150} y={pos.y + 80} textAnchor="middle" fill="#888" fontSize="16">Deploying...</text>
-                {/* Progress bar bg */}
-                <rect x={pos.x + 30} y={pos.y + 100} width="240" height="16" fill="#222" rx="8" />
-                {/* Progress bar fill */}
-                <rect x={pos.x + 30} y={pos.y + 100} width={240 * progress} height="16" fill="#00ffaa" rx="8" />
-                <text x={pos.x + 150} y={pos.y + 140} textAnchor="middle" fill="#00ffaa" fontSize="18" fontWeight="600">{Math.round(progress * 100)}%</text>
+                {/* Health warning indicator */}
+                {node.health < 0.5 && (
+                  <>
+                    <polygon
+                      points={`${pos.x + 116},${pos.y + 142} ${pos.x + 130},${pos.y + 162} ${pos.x + 144},${pos.y + 142}`}
+                      fill="none"
+                      stroke="var(--status-warn)"
+                      strokeWidth={2}
+                      opacity={0.8}
+                    />
+                    <text
+                      x={pos.x + 130}
+                      y={pos.y + 158}
+                      textAnchor="middle"
+                      fill="var(--status-warn)"
+                      fontSize={10}
+                      fontFamily="'JetBrains Mono', monospace"
+                      fontWeight={700}
+                    >
+                      !
+                    </text>
+                  </>
+                )}
               </g>
             );
-          }
+          })}
 
-          // Available: dashed border with deploy button
-          if (isAvailable) {
+          {/* === GHOST SLOTS: Undeployed Components === */}
+          {COMPONENT_BLUEPRINTS.map(bp => {
+            if (deployedComponents.has(bp.id)) return null;
+            const pos = basePositions[bp.id];
+            if (!pos) return null;
+
+            const isDeploying = deployingComponents.has(bp.id);
+            const deployInfo = deployingComponents.get(bp.id);
+            const { meetsPrereqs, unlocked, visible } = blueprintStatus(bp, deployedComponents, users, elapsedSec, totalIncidents);
+            const isAvailable = unlocked && !isDeploying;
+            const canAfford = cash >= bp.deployCost;
+
+            // Deploying: animated progress
+            if (isDeploying && deployInfo) {
+              const elapsed = (Date.now() - deployInfo.startTime) / 1000;
+              const progress = Math.min(1, elapsed / deployInfo.durationSec);
+              return (
+                <g key={`ghost-${bp.id}`}>
+                  <rect x={pos.x} y={pos.y} width="240" height="160" fill="#0a0a1a" stroke="#00ffaa" strokeWidth="3" rx="10" strokeDasharray="0" opacity="0.9" className="deploying-node" />
+                  <text x={pos.x + 120} y={pos.y + 40} textAnchor="middle" fill="#00ffaa" fontSize="20" fontWeight="bold">{bp.icon} {bp.name}</text>
+                  <text x={pos.x + 120} y={pos.y + 65} textAnchor="middle" fill="#888" fontSize="14">Deploying...</text>
+                  {/* Progress bar bg */}
+                  <rect x={pos.x + 20} y={pos.y + 82} width="200" height="14" fill="#222" rx="7" />
+                  {/* Progress bar fill */}
+                  <rect x={pos.x + 20} y={pos.y + 82} width={200 * progress} height="14" fill="#00ffaa" rx="7" />
+                  <text x={pos.x + 120} y={pos.y + 115} textAnchor="middle" fill="#00ffaa" fontSize="16" fontWeight="600">{Math.round(progress * 100)}%</text>
+                </g>
+              );
+            }
+
+            // Available: dashed border with deploy button
+            if (isAvailable) {
+              return (
+                <g key={`ghost-${bp.id}`} onClick={() => canAfford && onDeployComponent?.(bp.id)} style={{ cursor: canAfford ? 'pointer' : 'not-allowed' }}>
+                  <rect x={pos.x} y={pos.y} width="240" height="160" fill="#0a0a1a" stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="10" strokeDasharray="10,6" opacity="0.6" />
+                  <text x={pos.x + 120} y={pos.y + 45} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#555'} fontSize="28">
+                    {bp.icon}
+                  </text>
+                  <text x={pos.x + 120} y={pos.y + 75} textAnchor="middle" fill={canAfford ? '#ccc' : '#555'} fontSize="18" fontWeight="bold">{bp.name}</text>
+                  <text x={pos.x + 120} y={pos.y + 98} textAnchor="middle" fill="#888" fontSize="12">{bp.description.slice(0, 45)}...</text>
+                  {/* Deploy button */}
+                  <rect x={pos.x + 55} y={pos.y + 115} width="130" height="30" fill={canAfford ? '#00ffaa22' : '#33333366'} stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="8" />
+                  <text x={pos.x + 120} y={pos.y + 135} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#666'} fontSize="14" fontWeight="bold">
+                    {canAfford ? `Deploy $${bp.deployCost}` : `Need $${bp.deployCost}`}
+                  </text>
+                </g>
+              );
+            }
+
+            // Locked: dim outline with requirements. Far-future components stay hidden.
+            if (!visible) return null;
+
             return (
-              <g key={`ghost-${bp.id}`} onClick={() => canAfford && onDeployComponent?.(bp.id)} style={{ cursor: canAfford ? 'pointer' : 'not-allowed' }}>
-                <rect x={pos.x} y={pos.y} width="300" height="200" fill="#0a0a1a" stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="10" strokeDasharray="10,6" opacity="0.6" />
-                <text x={pos.x + 150} y={pos.y + 55} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#555'} fontSize="36">
-                  {bp.icon}
-                </text>
-                <text x={pos.x + 150} y={pos.y + 90} textAnchor="middle" fill={canAfford ? '#ccc' : '#555'} fontSize="20" fontWeight="bold">{bp.name}</text>
-                <text x={pos.x + 150} y={pos.y + 120} textAnchor="middle" fill="#888" fontSize="14">{bp.description.slice(0, 45)}...</text>
-                {/* Deploy button */}
-                <rect x={pos.x + 75} y={pos.y + 140} width="150" height="36" fill={canAfford ? '#00ffaa22' : '#33333366'} stroke={canAfford ? '#00ffaa' : '#555'} strokeWidth="2" rx="8" />
-                <text x={pos.x + 150} y={pos.y + 163} textAnchor="middle" fill={canAfford ? '#00ffaa' : '#666'} fontSize="16" fontWeight="bold">
-                  {canAfford ? `Deploy $${bp.deployCost}` : `Need $${bp.deployCost}`}
+              <g key={`ghost-${bp.id}`} opacity="0.3">
+                <rect x={pos.x} y={pos.y} width="240" height="160" fill="transparent" stroke="#333" strokeWidth="1" rx="10" strokeDasharray="12,8" />
+                <g>
+                  <rect
+                    x={pos.x + 60} y={pos.y + 50}
+                    width={120} height={32}
+                    rx={4}
+                    fill="rgba(62,62,82,0.8)"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={pos.x + 120} y={pos.y + 71}
+                    textAnchor="middle"
+                    fill="rgba(255,255,255,0.25)"
+                    fontSize={13}
+                    fontFamily="'Space Grotesk', system-ui, sans-serif"
+                    fontWeight={600}
+                    letterSpacing={1}
+                  >
+                    LOCKED
+                  </text>
+                </g>
+                <text x={pos.x + 120} y={pos.y + 100} textAnchor="middle" fill="#444" fontSize="14">{bp.name}</text>
+                <text x={pos.x + 120} y={pos.y + 120} textAnchor="middle" fill="#333" fontSize="12">
+                  {!meetsPrereqs ? `Requires: ${bp.prerequisites.filter(r => !deployedComponents.has(r)).join(', ')}` : bp.unlockConditions.minUsers ? `${bp.unlockConditions.minUsers}+ users` : 'Locked'}
                 </text>
               </g>
             );
-          }
-
-          // Locked: dim outline with requirements. Far-future components stay hidden.
-          if (!visible) return null;
-
-          return (
-            <g key={`ghost-${bp.id}`} opacity="0.3">
-              <rect x={pos.x} y={pos.y} width="300" height="200" fill="transparent" stroke="#333" strokeWidth="1" rx="10" strokeDasharray="12,8" />
-              <text x={pos.x + 150} y={pos.y + 70} textAnchor="middle" fill="#444" fontSize="32">🔒</text>
-              <text x={pos.x + 150} y={pos.y + 105} textAnchor="middle" fill="#444" fontSize="16">{bp.name}</text>
-              <text x={pos.x + 150} y={pos.y + 130} textAnchor="middle" fill="#333" fontSize="13">
-                {!meetsPrereqs ? `Requires: ${bp.prerequisites.filter(r => !deployedComponents.has(r)).join(', ')}` : bp.unlockConditions.minUsers ? `${bp.unlockConditions.minUsers}+ users` : 'Locked'}
-              </text>
-            </g>
-          );
-        })}
+          })}
         </g>
       </svg>
     </div>
   );
 }
-
