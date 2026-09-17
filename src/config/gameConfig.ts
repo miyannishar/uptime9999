@@ -219,11 +219,35 @@ export const GAME_CONFIG = {
   },
 
   // === MILESTONES ===
+  // Celebrated with a full-screen announcement + cash injection when first crossed.
   milestones: {
     canaryDeploy: { users: 10000 },
     dbReplica: { users: 50000 },
     multiRegion: { users: 100000 },
-    advancedObservability: { uptimeStreak: 1200 }, // 20 minutes
+    advancedObservability: { uptimeStreak: 1200 },
+  },
+
+  // === ENGAGEMENT ===
+  engagement: {
+    // Streak: how long (ms) after a player-mitigated resolve to keep the streak alive
+    streakWindowMs: 120_000,
+    // Combo cash bonuses per streak level (index = streak count, capped at last entry)
+    streakCashBonus: [0, 0, 50, 100, 200, 400, 800, 1500],
+    // Streak rep bonus per level (small, feels good)
+    streakRepBonus:  [0, 0,  1,   2,   3,   4,   5,    6],
+    // User milestones: [userCount, id, label, cashReward, message]
+    userMilestones: [
+      { users:  1_000, id: 'users_1k',   label: '1,000 Users!',   cash:  500, msg: '🎉 First thousand users! The product is real.' },
+      { users:  5_000, id: 'users_5k',   label: '5,000 Users!',   cash: 1000, msg: '🚀 5k users! Word is spreading fast.' },
+      { users: 10_000, id: 'users_10k',  label: '10,000 Users!',  cash: 2000, msg: '📈 10k users! We just made TechCrunch.' },
+      { users: 25_000, id: 'users_25k',  label: '25,000 Users!',  cash: 4000, msg: '💥 25k users! Series A incoming.' },
+      { users: 50_000, id: 'users_50k',  label: '50,000 Users!',  cash: 8000, msg: '🏆 50k users! The investors are calling.' },
+      { users: 100_000, id: 'users_100k', label: '100,000 Users!', cash: 15000, msg: '🌟 100k users! We are officially at scale.' },
+    ],
+    // How long (ms) to display the milestone banner
+    milestoneDurationMs: 5000,
+    // WARN escalates to CRIT after this many simulated seconds without any mitigation started
+    warnEscalateAfterSec: 150,
   },
 };
 

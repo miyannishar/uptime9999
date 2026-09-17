@@ -95,6 +95,16 @@ export default function HudBar({ state, onTogglePause, onNewGame, onSetSpeed }: 
               {state.reputation.toFixed(0)}
             </span>
           </div>
+
+          {/* Streak — only show when active */}
+          {state.resolveStreak >= 2 && (
+            <div className="hud-metric hud-streak">
+              <span className="hud-label">🔥 Streak</span>
+              <span className="hud-value hud-streak-value">
+                ×{state.resolveStreak}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Stress bars */}

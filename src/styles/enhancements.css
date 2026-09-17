@@ -795,3 +795,67 @@
   0%, 100% { stroke-opacity: 1; }
   50% { stroke-opacity: 0.4; }
 }
+
+/* ─── STREAK ──────────────────────────────────────────────────────────────── */
+.hud-streak { animation: streak-pop 0.3s ease; }
+.hud-streak-value {
+  color: #ff9900 !important;
+  font-weight: 700;
+  font-size: 1.3em;
+  text-shadow: 0 0 8px #ff990080;
+}
+@keyframes streak-pop {
+  0%   { transform: scale(0.8); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* ─── MILESTONE BANNER ───────────────────────────────────────────────────── */
+.milestone-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 40px;
+  background: linear-gradient(135deg, #0a0a2a 0%, #1a1a4a 50%, #0a0a2a 100%);
+  border: 2px solid #00ffaa;
+  border-radius: 16px;
+  box-shadow: 0 0 60px #00ffaa40, 0 0 120px #00ffaa20;
+  animation: milestone-enter 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards,
+             milestone-exit  0.4s ease-in 4.5s forwards;
+  pointer-events: none;
+}
+.milestone-emoji { font-size: 3rem; animation: milestone-spin 0.5s ease; }
+.milestone-text { display: flex; flex-direction: column; gap: 4px; }
+.milestone-label {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #00ffaa;
+  text-shadow: 0 0 12px #00ffaa;
+  font-family: 'JetBrains Mono', monospace;
+}
+.milestone-msg { font-size: 0.95rem; color: #aaa; }
+.milestone-reward {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 12px #ffd70080;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+@keyframes milestone-enter {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes milestone-exit {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -60%) scale(0.9); }
+}
+@keyframes milestone-spin {
+  from { transform: rotate(-20deg) scale(0.5); }
+  to   { transform: rotate(0deg) scale(1); }
+}

@@ -81,6 +81,11 @@ export function createInitialState(seed: string): GameState {
 
     activeIncidents: [],
     resolvedIncidents: 0,
+    resolveStreak: 0,
+    bestStreak: 0,
+    lastResolveTime: 0,
+    activeMilestone: null,
+    activeMilestoneTime: 0,
 
     actionsInProgress: [],
     actionCooldowns: new Map(),
@@ -546,6 +551,17 @@ function applyIncidentEffects(state: GameState, dt: number) {
       }
     }
 
+    // WARN → CRIT escalation: unmitigated WARNs become CRITs after the configured time.
+    // This makes inaction costly and maintains urgency throughout the run.
+    if (incident.severity === 'WARN' && incident.mitigationLevel < 0.1) {
+      const age = state.elapsedSim - incident.startSim;
+      if (age > GAME_CONFIG.engagement.warnEscalateAfterSec) {
+        incident.severity = 'CRIT';
+        tlog.error(`⬆️ ${incidentDef.name} escalated to CRIT — ignored too long!`);
+        soundNotifications.playIncidentCRIT();
+      }
+    }
+
     // Outage timer
     if (incidentDef.timeToOutageSeconds && incident.outagetimer > 0) {
       incident.outagetimer -= dt;
@@ -813,6 +829,22 @@ function updateBusiness(state: GameState, dt: number) {
   state.users = Math.max(0, state.users + userDelta);
   state.peakUsers = Math.max(state.peakUsers, state.users);
 
+  // === MILESTONE CELEBRATIONS ===
+  if (!state.activeMilestone) {
+    for (const m of GAME_CONFIG.engagement.userMilestones) {
+      if (state.users >= m.users && state.peakUsers < m.users) {
+        // First time crossing this threshold
+        state.activeMilestone = m.id;
+        state.activeMilestoneTime = Date.now();
+        state.cash += m.cash;
+        tlog.success(`🎉 MILESTONE: ${m.label} — +$${m.cash} cash! ${m.msg}`);
+        break;
+      }
+    }
+  } else if (Date.now() - state.activeMilestoneTime > GAME_CONFIG.engagement.milestoneDurationMs) {
+    state.activeMilestone = null;
+  }
+
   // Reputation
   const severityScore = state.activeIncidents.reduce((sum, inc) => {
     return sum + (inc.severity === 'CRIT' ? 3 : inc.severity === 'WARN' ? 2 : 1);
@@ -922,8 +954,29 @@ function updateIncidents(state: GameState, _dt: number) {
                 + autoResolvedThisTick * GAME_CONFIG.incidents.autoResolveReputationReward;
     state.reputation = Math.min(100, state.reputation + boost);
 
-    // O4: Direct call instead of dynamic import
-    tlog.success(`✨ Resolved ${resolvedThisTick} incident(s) (${mitigatedThisTick} fixed) — reputation +${boost.toFixed(1)}`);
+    // === STREAK SYSTEM ===
+    if (mitigatedThisTick > 0) {
+      const now = Date.now();
+      const eng = GAME_CONFIG.engagement;
+      const streakAlive = state.lastResolveTime > 0 && (now - state.lastResolveTime) < eng.streakWindowMs;
+      state.resolveStreak = streakAlive ? state.resolveStreak + mitigatedThisTick : mitigatedThisTick;
+      state.bestStreak = Math.max(state.bestStreak, state.resolveStreak);
+      state.lastResolveTime = now;
+
+      const streakIdx = Math.min(state.resolveStreak, eng.streakCashBonus.length - 1);
+      const cashBonus = eng.streakCashBonus[streakIdx];
+      const repBonus  = eng.streakRepBonus[streakIdx];
+      if (cashBonus > 0) state.cash += cashBonus;
+      if (repBonus  > 0) state.reputation = Math.min(100, state.reputation + repBonus);
+
+      if (state.resolveStreak >= 3) {
+        tlog.success(`🔥 STREAK ×${state.resolveStreak}! +$${cashBonus} +${repBonus} rep`);
+      } else {
+        tlog.success(`✨ Resolved ${resolvedThisTick} incident(s) (${mitigatedThisTick} fixed) — reputation +${boost.toFixed(1)}`);
+      }
+    } else {
+      tlog.success(`✨ Resolved ${resolvedThisTick} incident(s) — reputation +${boost.toFixed(1)}`);
+    }
   }
   
   // BREATHER MECHANIC: After resolving incidents, suppress new ones for 30s

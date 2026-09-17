@@ -387,6 +387,22 @@ function App() {
         timestamp={state.recentAchievementTime}
       />
 
+      {/* Milestone Banner */}
+      {state.activeMilestone && (() => {
+        const m = GAME_CONFIG.engagement.userMilestones.find(x => x.id === state.activeMilestone);
+        if (!m) return null;
+        return (
+          <div className="milestone-banner">
+            <span className="milestone-emoji">🎉</span>
+            <div className="milestone-text">
+              <div className="milestone-label">{m.label}</div>
+              <div className="milestone-msg">{m.msg}</div>
+            </div>
+            <div className="milestone-reward">+${m.cash.toLocaleString()}</div>
+          </div>
+        );
+      })()}
+
       {/* War Room Banner */}
       {state.warRoomActive && (
         <div className="war-room-banner">

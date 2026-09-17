@@ -281,6 +281,13 @@ export interface GameState {
   // Incidents
   activeIncidents: ActiveIncident[];
   resolvedIncidents: number;
+  // Streak: consecutive player-mitigated (not auto-resolved) incidents
+  resolveStreak: number;
+  bestStreak: number;
+  lastResolveTime: number; // wall-clock ms — streak breaks if gap > 120s
+  // Active milestone celebration (id of milestone currently being shown)
+  activeMilestone: string | null;
+  activeMilestoneTime: number;
   
   // Actions
   actionsInProgress: ActionInProgress[];

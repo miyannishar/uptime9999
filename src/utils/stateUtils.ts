@@ -36,6 +36,8 @@ export function cloneGameState(state: GameState): GameState {
     // Enhancement features
     achievements: new Set(state.achievements),
     tokenUsage: { ...state.tokenUsage },
+    // primitives copied by spread, listed here for auditability
+    // resolveStreak, bestStreak, lastResolveTime, activeMilestone, activeMilestoneTime
     stakeholderMessages: state.stakeholderMessages.map(m => ({ ...m, responses: [...m.responses] })),
     postMortemQueue: state.postMortemQueue.map(p => ({ ...p })),
     statusPageHistory: [...state.statusPageHistory],
