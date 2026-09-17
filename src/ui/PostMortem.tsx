@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { GameState } from '../sim/types';
 
 interface PostMortemProps {
@@ -22,8 +23,8 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
     ? `${durationSeconds}s` 
     : `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
 
-  // Pick 3 relevant action items randomly
-  const shuffled = [...ACTION_ITEMS].sort(() => Math.random() - 0.5);
+  // Pick 3 relevant action items randomly (stable for the lifetime of this modal)
+  const [shuffled] = useState(() => [...ACTION_ITEMS].sort(() => Math.random() - 0.5));
   const suggestedActions = shuffled.slice(0, 3);
 
   const handleAdopt = (actionIds: string[]) => {

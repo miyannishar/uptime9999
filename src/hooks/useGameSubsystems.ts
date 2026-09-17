@@ -144,10 +144,10 @@ export function useGameSubsystems(state: GameState, dispatch: Dispatch) {
         appInstances: [...s.architecture.nodes.values()].filter(n => n.type === 'APP' && n.redundancyGroup === 'app_cluster').length,
         lowestReputation: lowestReputation.current, highestReputation: s.reputation,
       };
-      for (const a of ACHIEVEMENTS) {
-        if (s.achievements.has(a.id) || !a.check(am)) continue;
-        dispatch({ type: 'UNLOCK_ACHIEVEMENT', achievementId: a.id });
-        persistAchievements(new Set([...s.achievements, a.id]));
+      const newlyUnlocked = ACHIEVEMENTS.filter(a => !s.achievements.has(a.id) && a.check(am));
+      if (newlyUnlocked.length) {
+        for (const a of newlyUnlocked) dispatch({ type: 'UNLOCK_ACHIEVEMENT', achievementId: a.id });
+        persistAchievements(new Set([...s.achievements, ...newlyUnlocked.map(a => a.id)]));
       }
 
       // Ignoring a stakeholder has a cost

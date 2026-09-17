@@ -593,8 +593,6 @@ function executeAction(
   if (actionId === 'upgrade_observability_traces') {
     newState.observabilityLevel = 'TRACES';
   }
-  // I1 FIX: Removed duplicate increase_price handler (price_increase at line 167 already handles 10%)
-
   // Dynamic remove operations - find and remove highest instance number
   if (actionId === 'remove_app_instance') {
     const appInstances = Array.from(newState.architecture.nodes.values())
