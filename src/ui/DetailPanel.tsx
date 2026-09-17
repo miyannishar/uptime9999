@@ -3,7 +3,9 @@ import { GameState } from '../sim/types';
 import { INCIDENTS } from '../data/incidents';
 import { ACTIONS } from '../data/actions';
 import { getResolutionActions } from '../sim/incidentActions';
+import { generateLocalTask } from '../sim/localTaskGenerator';
 import TaskModal from './TaskModal';
+import type { TaskData } from '../services/taskGenerator';
 
 interface DetailPanelProps {
   state: GameState;
@@ -32,6 +34,7 @@ export default function DetailPanel({
     targetNode: string;
     actionId: string;
     incidentId?: string;
+    initialTaskData?: TaskData;
   } | null>(null);
 
   // Auto-switch to incident tab when an incident is selected
@@ -407,7 +410,24 @@ export default function DetailPanel({
                                   key={action.id}
                                   className={`action-button ${isInProgress ? 'in-progress' : ''}`}
                                   disabled={!canExecute || cooldown > 0 || isInProgress}
-                                  onClick={() => onMitigateIncident(selectedIncident.id, action.id)}
+                                  onClick={() => {
+                                    const def = INCIDENTS.find(i => i.id === selectedIncident.definitionId);
+                                    if (def) {
+                                      setTaskModalData({
+                                        incidentName: def.name,
+                                        incidentDescription: def.description,
+                                        actionName: action.name,
+                                        actionDescription: action.description,
+                                        targetNode: selectedIncident.targetNodeId,
+                                        actionId: action.id,
+                                        incidentId: selectedIncident.id,
+                                        initialTaskData: generateLocalTask(def, action),
+                                      });
+                                      setTaskModalOpen(true);
+                                    } else {
+                                      onMitigateIncident(selectedIncident.id, action.id);
+                                    }
+                                  }}
                                 >
                                   <div className="action-name">
                                     {action.name}
@@ -502,20 +522,18 @@ export default function DetailPanel({
           actionDescription={taskModalData.actionDescription}
           targetNode={taskModalData.targetNode}
           isGamePaused={state.paused}
+          initialTaskData={taskModalData.initialTaskData}
           onComplete={() => {
             setTaskModalOpen(false);
-            // Execute the actual action after task completion
-            if (taskModalData.incidentId) {
-              // Find the AI action details to get cost and duration
+            if (taskModalData.incidentId && taskModalData.actionId) {
+              // Template incident: use the normal mitigate path
+              onMitigateIncident(taskModalData.incidentId, taskModalData.actionId);
+            } else if (taskModalData.incidentId) {
+              // AI incident: use the AI action path
               const incident = state.activeIncidents.find(i => i.id === taskModalData.incidentId);
               const aiAction = incident?.aiSuggestedActions?.find(a => a.actionName === taskModalData.actionName);
               if (aiAction) {
-                onExecuteAIAction(
-                  taskModalData.actionName,
-                  aiAction.cost,
-                  aiAction.durationSeconds,
-                  taskModalData.incidentId
-                );
+                onExecuteAIAction(taskModalData.actionName, aiAction.cost, aiAction.durationSeconds, taskModalData.incidentId);
               }
             }
           }}

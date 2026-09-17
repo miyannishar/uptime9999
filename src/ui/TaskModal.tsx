@@ -17,6 +17,8 @@ interface TaskModalProps {
   actionDescription: string;
   targetNode: string;
   isGamePaused?: boolean;
+  /** Pre-generated task data — skips API call entirely (used for template incidents) */
+  initialTaskData?: TaskData;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -28,19 +30,23 @@ export default function TaskModal({
   actionDescription,
   targetNode,
   isGamePaused = false,
+  initialTaskData,
   onComplete,
   onClose,
 }: TaskModalProps) {
-  const [taskData, setTaskData] = useState<TaskData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [taskData, setTaskData] = useState<TaskData | null>(initialTaskData ?? null);
+  const [isLoading, setIsLoading] = useState(!initialTaskData);
   const [error, setError] = useState<string | null>(null);
   const [taskCompleted, setTaskCompleted] = useState(false);
-  
+
   // Track if we've already generated a task for this combination
   const generatedTaskRef = useRef<string>('');
   const isGeneratingRef = useRef(false);
 
   useEffect(() => {
+    // Local task provided — no API call needed
+    if (initialTaskData) return;
+
     // Don't make API calls if game is paused
     if (isGamePaused) {
       setError('Game is paused. Please resume the game to generate tasks.');
