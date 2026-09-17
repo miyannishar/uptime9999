@@ -1,5 +1,6 @@
 import { GameState } from '../sim/types';
 import { ACTIONS } from '../data/actions';
+import { AiBadge } from './atoms';
 
 interface ActivityLogProps {
   state: GameState;
@@ -61,7 +62,7 @@ export default function ActivityLog({ state }: ActivityLogProps) {
               <div key={action.id} className={`activity-item ${isAIAction ? 'ai-action-item' : ''}`}>
                 <div className="activity-info">
                   <span className="activity-name">
-                    {isAIAction && '🤖 '}
+                    {isAIAction && <AiBadge />}
                     {actionName}
                   </span>
                   {action.targetNodeId && (

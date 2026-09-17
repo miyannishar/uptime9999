@@ -42,16 +42,16 @@ export default function TerminalCommandTask({
 
   return (
     <div className="task-container terminal-task">
-      <h3>⚡ Terminal Command</h3>
+      <h3>Terminal Command</h3>
       <p className="task-description">{prompt}</p>
 
       <div className="task-hints">
         <div className="hint-box">
-          <strong>💡 Complete the command:</strong> <code>{command}<span style={{color: 'var(--accent-yellow)'}}>{placeholder}</span></code>
+          <strong>Complete the command:</strong> <code>{command}<span style={{color: 'var(--accent-yellow)'}}>{placeholder}</span></code>
         </div>
         {attempts >= 2 && (
           <div className="hint-box expected-fix">
-            <strong>🎯 Answer:</strong> <code>{expectedCompletion}</code>
+            <strong>Answer:</strong> <code>{expectedCompletion}</code>
           </div>
         )}
       </div>
@@ -83,7 +83,7 @@ export default function TerminalCommandTask({
 
       <div className="task-actions">
         <button className="task-submit-btn" onClick={handleSubmit}>
-          ▶️ Execute Command
+          Execute →
         </button>
         <button 
           className="task-skip-btn" 

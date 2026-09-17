@@ -67,7 +67,7 @@ export default function DragDropTask({
         setTimeout(() => onComplete(), 1000);
       }
     } else {
-      setError(`❌ "${item.label}" doesn't belong there. Try another target.`);
+      setError(`"${item.label}" doesn't belong there. Try another target.`);
       setTimeout(() => setError(''), 2000);
     }
 
@@ -81,7 +81,7 @@ export default function DragDropTask({
 
   return (
     <div className="task-container drag-drop-task">
-      <h3>🎯 {title}</h3>
+      <h3>{title}</h3>
       <p className="task-description">{description}</p>
 
       <div className="drag-drop-container">
@@ -130,7 +130,7 @@ export default function DragDropTask({
       </div>
 
       {error && <div className="task-error">{error}</div>}
-      {success && <div className="task-success">✅ All items placed correctly!</div>}
+      {success && <div className="task-success">All items placed correctly!</div>}
     </div>
   );
 }

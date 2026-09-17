@@ -38,7 +38,7 @@ export default function AchievementToast({ achievementId, timestamp }: Achieveme
       <div className="achievement-toast-content">
         <div className="achievement-toast-icon">{achievement.icon}</div>
         <div className="achievement-toast-info">
-          <div className="achievement-toast-title">🏆 Achievement Unlocked!</div>
+          <div className="achievement-toast-title">Achievement Unlocked</div>
           <div className="achievement-toast-name">{achievement.name}</div>
           <div className="achievement-toast-desc">{achievement.description}</div>
           <div 

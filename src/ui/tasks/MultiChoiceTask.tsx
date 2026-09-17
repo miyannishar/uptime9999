@@ -78,7 +78,7 @@ export default function MultiChoiceTask({
 
       {showResult && !selectedOption?.correct && attempts < 3 && (
         <div className="task-hint">
-          <p>💡 Not quite right. Try again! {selectedOption?.explanation || ''}</p>
+          <p>Not quite right. Try again! {selectedOption?.explanation || ''}</p>
           <button 
             className="task-retry-btn" 
             onClick={() => {
@@ -92,7 +92,7 @@ export default function MultiChoiceTask({
       )}
 
       {showResult && selectedOption?.correct && (
-        <div className="task-success">✅ Correct! {selectedOption.explanation}</div>
+        <div className="task-success">Correct! {selectedOption.explanation}</div>
       )}
 
       <div className="task-actions">
@@ -101,7 +101,7 @@ export default function MultiChoiceTask({
           onClick={handleSubmit}
           disabled={!selectedId || showResult}
         >
-          {showResult && selectedOption?.correct ? '✅ Correct!' : 'Submit Answer'}
+          {showResult && selectedOption?.correct ? 'Correct!' : 'Submit Answer'}
         </button>
       </div>
     </div>

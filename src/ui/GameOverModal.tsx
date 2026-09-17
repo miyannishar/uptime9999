@@ -90,7 +90,7 @@ export default function GameOverModal({ state, onNewGame, onClose }: GameOverMod
 
         <div className="modal-actions">
           <button className="modal-button primary" onClick={onNewGame}>
-            🔄 New Run
+            ↺ New Run
           </button>
           <button className="modal-button secondary" onClick={onClose}>
             Close

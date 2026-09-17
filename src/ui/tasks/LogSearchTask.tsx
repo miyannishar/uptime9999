@@ -57,7 +57,7 @@ export default function LogSearchTask({
 
       <div className="task-hints">
         <div className="hint-box">
-          <strong>💡 Tip:</strong> Look for ERROR or WARN level logs that mention "{targetError}"
+          <strong>Tip:</strong> Look for ERROR or WARN level logs that mention "{targetError}"
         </div>
       </div>
 

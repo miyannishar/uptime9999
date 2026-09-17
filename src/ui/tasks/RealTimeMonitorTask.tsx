@@ -65,7 +65,7 @@ export default function RealTimeMonitorTask({
         setTimeout(() => onComplete(), 1000);
       }
     } else {
-      setError(`❌ ${metricName} hasn't reached the threshold yet! Wait for it to ${metric.threshold === 'above' ? 'increase' : 'decrease'} to ${metric.target}${metric.unit}`);
+      setError(`${metricName} hasn't reached the threshold yet! Wait for it to ${metric.threshold === 'above' ? 'increase' : 'decrease'} to ${metric.target}${metric.unit}`);
       setTimeout(() => setError(''), 2000);
     }
   };
@@ -78,7 +78,7 @@ export default function RealTimeMonitorTask({
 
   return (
     <div className="task-container monitor-task">
-      <h3>📊 {title}</h3>
+      <h3>{title}</h3>
       <p className="task-description">{description}</p>
 
       <div className="metrics-grid">
@@ -118,10 +118,10 @@ export default function RealTimeMonitorTask({
       </div>
 
       {error && <div className="task-error">{error}</div>}
-      {success && <div className="task-success">✅ All metrics monitored correctly!</div>}
+      {success && <div className="task-success">All metrics monitored correctly!</div>}
 
       <div className="task-hint">
-        <p>💡 Watch the metrics and click each one when it reaches its target threshold</p>
+        <p>Watch the metrics and click each one when it reaches its target threshold</p>
       </div>
     </div>
   );

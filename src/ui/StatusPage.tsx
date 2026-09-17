@@ -54,7 +54,7 @@ export default function StatusPage({ state, onUpdateStatus }: StatusPageProps) {
       <div 
         className={`status-page-widget ${isStale ? 'stale' : ''} ${isLying ? 'lying' : ''}`}
         onClick={() => setIsExpanded(true)}
-        title={isStale ? '⚠️ Status page is stale! Update it!' : isLying ? '🚫 Status page is inaccurate!' : 'Click to update status page'}
+        title={isStale ? 'Status page is stale! Update it!' : isLying ? 'Status page is inaccurate!' : 'Click to update status page'}
       >
         <span className="status-page-icon">{currentStatus.icon}</span>
         <span className="status-page-label">{currentStatus.label}</span>
@@ -66,14 +66,14 @@ export default function StatusPage({ state, onUpdateStatus }: StatusPageProps) {
       {isExpanded && (
         <div className="modal-overlay" onClick={() => setIsExpanded(false)}>
           <div className="modal-content status-page-modal" onClick={e => e.stopPropagation()}>
-            <h2>📊 Status Page</h2>
+            <h2>Status Page</h2>
             <p className="status-page-subtitle">
               Your customers and stakeholders are watching. Be transparent.
             </p>
 
             {!isAccurate && (
               <div className="status-page-warning">
-                ⚠️ Your current status ({currentStatus.label}) doesn't match system reality.
+                Your current status ({currentStatus.label}) doesn't match system reality.
                 Inaccurate reporting erodes trust 3× faster.
               </div>
             )}

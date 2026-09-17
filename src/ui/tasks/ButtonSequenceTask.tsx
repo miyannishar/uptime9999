@@ -54,7 +54,7 @@ export default function ButtonSequenceTask({
 
   return (
     <div className="task-container button-sequence-task">
-      <h3>🎯 {title}</h3>
+      <h3>{title}</h3>
       <p className="task-description">{description}</p>
 
       <div className="progress-indicator">
@@ -89,7 +89,7 @@ export default function ButtonSequenceTask({
       </div>
 
       {error && <div className="task-error">{error}</div>}
-      {success && <div className="task-success">✅ All steps completed correctly!</div>}
+      {success && <div className="task-success">All steps completed correctly!</div>}
     </div>
   );
 }

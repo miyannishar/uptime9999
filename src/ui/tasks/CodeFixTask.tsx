@@ -48,11 +48,11 @@ export default function CodeFixTask({
       
       <div className="task-hints">
         <div className="hint-box">
-          <strong>💡 Hint:</strong> {fixHint}
+          <strong>Hint:</strong> {fixHint}
         </div>
         {showHint && expectedFix && (
           <div className="hint-box expected-fix">
-            <strong>🎯 Expected Fix:</strong>
+            <strong>Expected Fix:</strong>
             <pre>{expectedFix}</pre>
           </div>
         )}
@@ -80,7 +80,7 @@ export default function CodeFixTask({
 
       <div className="task-actions">
         <button className="task-submit-btn" onClick={handleSubmit}>
-          🔧 Apply Fix
+          Apply Fix
         </button>
         <button 
           className="task-skip-btn" 

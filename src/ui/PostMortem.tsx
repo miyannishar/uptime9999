@@ -12,8 +12,8 @@ const ACTION_ITEMS = [
   { id: 'redundant_region', label: '🌍 Add Redundant Region', description: 'Deploy to a secondary cloud region for failover', benefit: 'Reputation +5' },
   { id: 'chaos_testing', label: '🐒 Schedule Chaos Testing', description: 'Regular failure injection to find weaknesses', benefit: 'Tech debt -3' },
   { id: 'runbook_update', label: '📖 Update Runbooks', description: 'Document this failure mode for faster future resolution', benefit: 'Burnout -5' },
-  { id: 'alert_tuning', label: '🔔 Tune Alert Thresholds', description: 'Reduce noise, improve signal for on-call engineers', benefit: 'Alert fatigue -5' },
-  { id: 'capacity_planning', label: '📊 Capacity Planning Review', description: 'Ensure headroom for traffic spikes', benefit: 'Reputation +3' },
+  { id: 'alert_tuning', label: 'Tune Alert Thresholds', description: 'Reduce noise, improve signal for on-call engineers', benefit: 'Alert fatigue -5' },
+  { id: 'capacity_planning', label: 'Capacity Planning Review', description: 'Ensure headroom for traffic spikes', benefit: 'Reputation +3' },
   { id: 'postmortem_review', label: '👥 Team Post-Mortem Review', description: 'Share learnings with the broader engineering team', benefit: 'Reputation +2, Burnout -3' },
 ];
 
@@ -35,7 +35,7 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
     <div className="modal-overlay">
       <div className="modal-content postmortem-modal" onClick={e => e.stopPropagation()}>
         <div className="postmortem-header">
-          <h2>📋 Post-Mortem Report</h2>
+          <h2>Post-Mortem Report</h2>
           <span className={`postmortem-severity severity-${incident.severity.toLowerCase()}`}>
             {incident.severity}
           </span>
@@ -68,7 +68,7 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
         </div>
 
         <div className="postmortem-impact">
-          <h4>💥 Impact</h4>
+          <h4>Impact</h4>
           <div className="impact-grid">
             <div className="impact-item">
               <span className="impact-label">Affected Component</span>
@@ -86,7 +86,7 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
         </div>
 
         <div className="postmortem-actions">
-          <h4>🎯 Action Items</h4>
+          <h4>Action Items</h4>
           <p className="action-items-hint">Select items to adopt — each provides real gameplay benefits</p>
           <div className="action-items-list">
             {suggestedActions.map(action => (
@@ -100,7 +100,7 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
                   className="action-item-adopt-btn"
                   onClick={() => handleAdopt([action.id])}
                 >
-                  ✅ Adopt
+                  Adopt
                 </button>
               </div>
             ))}
@@ -109,7 +109,7 @@ export default function PostMortem({ incident, onComplete, onSkip }: PostMortemP
 
         <div className="modal-actions">
           <button className="modal-button primary" onClick={() => handleAdopt([])}>
-            📋 Complete Post-Mortem (+5 rep)
+            Complete Post-Mortem (+5 rep)
           </button>
           <button className="modal-button secondary" onClick={onSkip}>
             Skip

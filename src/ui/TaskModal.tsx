@@ -136,7 +136,7 @@ export default function TaskModal({
         <button className="modal-close" onClick={onClose}>×</button>
         
         <div className="task-modal-header">
-          <h2>🎯 Action Task</h2>
+          <h2>Action Required</h2>
           <div className="task-context">
             <div><strong>Incident:</strong> {incidentName}</div>
             <div><strong>Action:</strong> {actionName}</div>
@@ -162,7 +162,7 @@ export default function TaskModal({
 
           {!isLoading && !error && !taskData && (
             <div className="task-error-message">
-              <p>⚠️ AI generated an invalid task (inconsistent data)</p>
+              <p>Invalid task data</p>
               <p className="task-hint">This happens when the AI makes mistakes. Skipping the interactive task...</p>
               <button className="task-submit-btn" onClick={onComplete}>
                 Execute Action Directly
@@ -246,7 +246,7 @@ export default function TaskModal({
 
           {taskCompleted && (
             <div className="task-success">
-              <div className="success-icon">✅</div>
+              <div className="success-icon">✓</div>
               <p>Task completed! Executing action...</p>
             </div>
           )}

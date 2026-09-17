@@ -44,7 +44,7 @@ export default function IncidentTimeline({ state }: IncidentTimelineProps) {
     return (
       <div className="incident-timeline">
         <div className="timeline-header">
-          <span className="timeline-title">📊 Incident Timeline</span>
+          <span className="timeline-title">Incident Timeline</span>
         </div>
         <div className="timeline-empty">No incidents yet — enjoy the calm ☀️</div>
       </div>
@@ -68,7 +68,7 @@ export default function IncidentTimeline({ state }: IncidentTimelineProps) {
   return (
     <div className="incident-timeline">
       <div className="timeline-header">
-        <span className="timeline-title">📊 Incident Timeline</span>
+        <span className="timeline-title">Incident Timeline</span>
         <span className="timeline-stats">
           {state.incidentHistory.length} resolved · {state.activeIncidents.length} active
         </span>

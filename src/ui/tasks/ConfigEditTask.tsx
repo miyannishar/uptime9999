@@ -57,7 +57,7 @@ export default function ConfigEditTask({
       
       <div className="task-hints">
         <div className="hint-box">
-          <strong>💡 What to do:</strong> Find the line with <code>{targetKey}</code> and change its value from <code>{currentValue}</code> to <code>{targetValue}</code>
+          <strong>What to do:</strong> Find the line with <code>{targetKey}</code> and change its value from <code>{currentValue}</code> to <code>{targetValue}</code>
         </div>
         <div className="hint-box">
           <strong>🔍 Look for:</strong> <code>{targetKey} {currentValue}</code> or <code>{targetKey}={currentValue}</code> or <code>{targetKey}: {currentValue}</code>
@@ -81,7 +81,7 @@ export default function ConfigEditTask({
 
       <div className="task-actions">
         <button className="task-submit-btn" onClick={handleSubmit}>
-          💾 Save Configuration
+          Save Configuration
         </button>
         <button 
           className="task-skip-btn" 
